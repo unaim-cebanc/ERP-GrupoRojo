@@ -4,6 +4,7 @@ pom.xml.versionsBackup
 pom.xml.releaseBackup
 release.properties
 
+
 # Java
 *.class
 hs_err_pid*
@@ -41,3 +42,4 @@ Desktop.ini
 .env.*
 !.env.example
 !.env.template
+config.properties
