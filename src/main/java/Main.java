@@ -1,8 +1,9 @@
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Scanner;
 public class Main {
@@ -60,11 +61,70 @@ public class Main {
         }
     }
     
-    private void probarConexion(Properties p, String usuario, String contraseña) {
+    /* private void probarConexion(Properties p, String usuario, String contraseña) {
         try (Connection conn = DriverManager.getConnection(
             p.getProperty("db.url"), usuario, contraseña )) {
             System.out.println("Conexión exitosa");
         } catch (SQLException e) {System.out.println("Error: " + e.getMessage());}
+    } */
+    
+    public static void imprimirLinea(String[] valores, int[] anchos) {
+        StringBuilder linea = new StringBuilder();
+        for (int i = 0; i < valores.length; i++) {
+            String valor = valores[i];
+            linea.append("| ");
+            linea.append(String.format("%-" + anchos[i] + "s", valor));
+            linea.append(" ");
+        }
+        linea.append("|");
+        System.out.println(linea);
+    }
+    
+    public static void imprimirSeparador(int[] anchos) {
+        StringBuilder linea = new StringBuilder();
+        for (int ancho : anchos) {
+            linea.append("|-");
+            linea.append("-".repeat(ancho + 1));
+        }
+        linea.append("|");
+        System.out.println(linea);
+    }
+    
+    public static String[] recogerCabeceras(ResultSetMetaData md, int columnas) {
+        String[] cabeceras = new String[columnas];
+        try {
+            for (int i = 0; i < columnas; i++) {
+                cabeceras[i] = md.getColumnLabel(i + 1);
+            }
+        } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); }
+        return cabeceras;
+    }
+    
+    public static ArrayList<String[]> recogerDatos(ResultSet rs, int columnas) {
+        ArrayList<String[]> filas = new ArrayList<>();
+        try {
+            while (rs.next()) {
+                String[] fila = new String[columnas];
+            for (int i = 0; i < columnas; i++) {
+                fila[i] = rs.getString(i + 1);
+            }
+            filas.add(fila);
+            }
+        } catch (SQLException e) { System.out.println("Error: " + e.getMessage());}
+        return filas;
+    }
+    
+    public static int[] calcularAnchos(int columnas, String[] cabeceras, ArrayList<String[]> filas) {
+        int[] anchos = new int[columnas];
+        for (int i = 0; i < columnas; i++) {
+            anchos[i] = cabeceras[i].length();
+            for (String[] fila : filas) {
+                if (fila[i] != null && fila[i].length() > anchos[i]) {
+                    anchos[i] = fila[i].length();
+                }
+            }
+        }
+        return anchos;
     }
     
     public static String leerString(Scanner scanner, String mensaje) {
@@ -72,6 +132,7 @@ public class Main {
         String entrada = scanner.nextLine().trim();
         return entrada;
     }
+    
     public static int leerInt(Scanner scanner, String mensaje) {
         while (true) { 
             System.out.print(mensaje);
@@ -82,6 +143,7 @@ public class Main {
         }
     }
 }
+
 // aplicacion = funciona;
 // estetica = bonito;
 // funciones = muchas;
