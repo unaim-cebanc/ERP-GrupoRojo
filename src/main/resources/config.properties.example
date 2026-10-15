@@ -1,3 +1,7 @@
 db.url =
-db.user = 
-db.pass = 
+deca_admin =
+deca_crm =
+deca_ventas =
+deca_compras =
+deca_inventario =
+deca_fabricacion =
