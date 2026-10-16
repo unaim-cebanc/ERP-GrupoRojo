@@ -1,0 +1,231 @@
+USE decasport;
+
+-- ==========================================================
+-- 1. OPORTUNIDADES (CRM)
+-- Embudo comercial: cada oportunidad pertenece a un cliente
+-- y avanza por etapas hasta ganarse o perderse.
+-- ==========================================================
+
+CREATE TABLE oportunidades (
+    id                    INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    cliente_id            INT UNSIGNED  NOT NULL,
+    titulo                VARCHAR(150)  NOT NULL,
+    importe_estimado      DECIMAL(12,2) NOT NULL DEFAULT 0,
+    probabilidad          TINYINT UNSIGNED NOT NULL DEFAULT 10,
+    etapa                 ENUM(
+                              'prospecto',
+                              'propuesta',
+                              'negociacion',
+                              'ganada',
+                              'perdida'
+                          ) NOT NULL DEFAULT 'prospecto',
+    fecha_creacion        DATE          NOT NULL DEFAULT (CURRENT_DATE),
+    fecha_cierre_prevista DATE          NULL,
+    fecha_cierre          DATE          NULL,
+
+    PRIMARY KEY (id),
+
+    CONSTRAINT fk_oportunidades_cliente
+        FOREIGN KEY (cliente_id)
+        REFERENCES clientes (id),
+
+    CONSTRAINT ck_oportunidades_importe
+        CHECK (importe_estimado >= 0),
+
+    CONSTRAINT ck_oportunidades_probabilidad
+        CHECK (probabilidad <= 100),
+
+    CONSTRAINT ck_oportunidades_cierre_etapa
+        CHECK (
+            (etapa IN ('ganada','perdida') AND fecha_cierre IS NOT NULL)
+            OR
+            (etapa NOT IN ('ganada','perdida') AND fecha_cierre IS NULL)
+        )
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 2. PRESUPUESTOS
+-- Cabecera de la oferta enviada a un cliente.
+-- Puede venir de una oportunidad y, si se acepta, se enlaza
+-- con el pedido de venta que genera (pedido_id).
+-- ==========================================================
+
+CREATE TABLE presupuestos (
+    id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    cliente_id     INT UNSIGNED NOT NULL,
+    oportunidad_id INT UNSIGNED NULL,
+    pedido_id      INT UNSIGNED NULL,
+    fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_validez  DATE         NOT NULL,
+    estado         ENUM(
+                       'borrador',
+                       'enviado',
+                       'aceptado',
+                       'rechazado',
+                       'caducado'
+                   ) NOT NULL DEFAULT 'borrador',
+    observaciones  VARCHAR(500) NULL,
+
+    PRIMARY KEY (id),
+
+    UNIQUE KEY uq_presupuestos_pedido (pedido_id),
+
+    CONSTRAINT fk_presupuestos_cliente
+        FOREIGN KEY (cliente_id)
+        REFERENCES clientes (id),
+
+    CONSTRAINT fk_presupuestos_oportunidad
+        FOREIGN KEY (oportunidad_id)
+        REFERENCES oportunidades (id),
+
+    CONSTRAINT fk_presupuestos_pedido
+        FOREIGN KEY (pedido_id)
+        REFERENCES pedidos (id),
+
+    CONSTRAINT ck_presupuestos_validez
+        CHECK (fecha_validez >= DATE(fecha))
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 3. LÍNEAS DE PRESUPUESTO
+-- Detalle de productos, cantidades, precio ofertado y descuento.
+-- ==========================================================
+
+CREATE TABLE lineas_presupuesto (
+    id              INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    presupuesto_id  INT UNSIGNED  NOT NULL,
+    producto_id     INT UNSIGNED  NOT NULL,
+    cantidad        INT           NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    descuento_pct   DECIMAL(5,2)  NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (id),
+
+    UNIQUE KEY uq_lineas_presupuesto_producto (
+        presupuesto_id,
+        producto_id
+    ),
+
+    CONSTRAINT fk_lineas_presupuesto_presupuesto
+        FOREIGN KEY (presupuesto_id)
+        REFERENCES presupuestos (id),
+
+    CONSTRAINT fk_lineas_presupuesto_producto
+        FOREIGN KEY (producto_id)
+        REFERENCES productos (id),
+
+    CONSTRAINT ck_lineas_presupuesto_cantidad
+        CHECK (cantidad > 0),
+
+    CONSTRAINT ck_lineas_presupuesto_precio
+        CHECK (precio_unitario >= 0),
+
+    CONSTRAINT ck_lineas_presupuesto_descuento
+        CHECK (descuento_pct BETWEEN 0 AND 100)
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 4. CRM: enlazar las interacciones existentes con oportunidades
+-- La columna es opcional (NULL = contacto suelto sin oportunidad).
+-- ==========================================================
+
+ALTER TABLE interacciones
+    ADD COLUMN oportunidad_id INT UNSIGNED NULL AFTER cliente_id,
+    ADD CONSTRAINT fk_interacciones_oportunidad
+        FOREIGN KEY (oportunidad_id)
+        REFERENCES oportunidades (id);
+
+
+-- ==========================================================
+-- 5. DATOS DE EJEMPLO
+-- ==========================================================
+
+INSERT INTO oportunidades
+    (cliente_id, titulo, importe_estimado, probabilidad, etapa,
+     fecha_creacion, fecha_cierre_prevista, fecha_cierre)
+VALUES
+ (6, 'Equipación del club temporada 26/27',  4800.00,  60, 'negociacion', '2026-09-10', '2026-11-15', NULL),         -- 1
+ (4, 'Pack de material de ciclismo',          450.00, 100, 'ganada',      '2026-09-01', '2026-09-30', '2026-09-28'), -- 2
+ (1, 'Zapatillas de trail y ropa técnica',    250.00,  50, 'propuesta',   '2026-10-03', '2026-11-03', NULL),         -- 3
+ (3, 'Catálogo de material de running',       300.00,  20, 'prospecto',   '2026-10-08', '2026-12-01', NULL),         -- 4
+ (5, 'Equipamiento para maratón',             380.00,   0, 'perdida',     '2026-09-05', '2026-09-25', '2026-09-20'); -- 5
+
+-- Enlazamos las interacciones que ya existían (ids 1 a 5)
+UPDATE interacciones SET oportunidad_id = 3 WHERE id = 1;   -- Iker: zapatillas de trail
+UPDATE interacciones SET oportunidad_id = 2 WHERE id = 2;   -- Pierre: material de ciclismo
+UPDATE interacciones SET oportunidad_id = 1 WHERE id IN (3, 4);   -- Club Atletismo: equipación
+UPDATE interacciones SET oportunidad_id = 4 WHERE id = 5;   -- Maialen: catálogo
+
+INSERT INTO presupuestos
+    (cliente_id, oportunidad_id, pedido_id, fecha, fecha_validez, estado, observaciones)
+VALUES
+ (6, 1, NULL, '2026-09-21 09:30:00', '2026-10-21', 'enviado',  'Propuesta de equipación para la temporada'),   -- 1
+ (4, 2, 2,    '2026-09-20 11:00:00', '2026-10-20', 'aceptado', 'Aceptado: se convirtió en el pedido 2'),         -- 2
+ (1, 3, NULL, '2026-10-03 17:30:00', '2026-11-03', 'borrador', NULL);                                            -- 3
+
+INSERT INTO lineas_presupuesto
+    (presupuesto_id, producto_id, cantidad, precio_unitario, descuento_pct)
+VALUES
+ (1, 2, 20, 19.95, 10),
+ (1, 8, 10, 22.90, 10),
+ (1, 10, 15, 12.95,  5),
+ (2, 3,  1, 59.90,  0),
+ (2, 5,  1, 84.90,  0),
+ (3, 1,  1, 89.90,  0),
+ (3, 2,  2, 19.95,  0);
+
+
+-- ==========================================================
+-- 6. VISTAS
+-- ==========================================================
+
+-- Embudo de ventas por etapa (importe_ponderado = importe x probabilidad)
+CREATE OR REPLACE DEFINER = 'root'@'localhost' SQL SECURITY DEFINER VIEW v_pipeline_crm AS
+SELECT etapa,
+       COUNT(*)                                          AS num_oportunidades,
+       SUM(importe_estimado)                             AS importe_total,
+       ROUND(SUM(importe_estimado * probabilidad / 100), 2) AS importe_ponderado
+  FROM oportunidades
+ GROUP BY etapa;
+
+-- Presupuestos con su total sin IVA
+CREATE OR REPLACE DEFINER = 'root'@'localhost' SQL SECURITY DEFINER VIEW v_presupuestos_resumen AS
+SELECT p.id AS presupuesto_id,
+       c.nombre AS cliente,
+       p.estado,
+       p.fecha,
+       p.fecha_validez,
+       COALESCE((SELECT ROUND(SUM(l.cantidad * l.precio_unitario * (1 - l.descuento_pct / 100)), 2)
+                   FROM lineas_presupuesto l
+                  WHERE l.presupuesto_id = p.id), 0) AS total_sin_iva
+  FROM presupuestos p
+  JOIN clientes c ON c.id = p.cliente_id;
+
+
+-- ==========================================================
+-- 7. COMPROBACIÓN
+-- Deben aparecer las tres tablas.
+-- ==========================================================
+
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'decasport'
+  AND table_name IN (
+      'oportunidades',
+      'presupuestos',
+      'lineas_presupuesto'
+  )
+ORDER BY table_name;
+
+
+
+-- Resultados esperados:
+--   SELECT * FROM v_pipeline_crm;
+--       negociacion 1 / 4800.00 / 2880.00   ganada 1 / 450.00 / 450.00
+--       propuesta   1 /  250.00 /  125.00   prospecto 1 / 300.00 / 60.00
+--       perdida     1 /  380.00 /    0.00
+--   SELECT * FROM v_presupuestos_resumen;
+--       presupuesto 1 = 749.74   presupuesto 2 = 144.80   presupuesto 3 = 129.80
