@@ -1,0 +1,216 @@
+USE decasport;
+
+GRANT SELECT, INSERT, UPDATE ON decasport.clientes           TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.interacciones      TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.oportunidades      TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.presupuestos       TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON decasport.lineas_presupuesto TO 'deca_crm'@'%';
+
+-- Necesita ver el catálogo para presupuestar
+GRANT SELECT ON decasport.productos             TO 'deca_crm'@'%';
+GRANT SELECT ON decasport.v_pipeline_crm        TO 'deca_crm'@'%';
+GRANT SELECT ON decasport.v_presupuestos_resumen TO 'deca_crm'@'%';
+GRANT SELECT ON decasport.v_catalogo_movil      TO 'deca_crm'@'%';
+
+
+-- ==========================================================
+-- 3. VENTAS
+-- Crea pedidos y los factura. Consulta clientes, presupuestos
+-- y stock, pero no modifica clientes ni inventario.
+-- ==========================================================
+
+GRANT SELECT, INSERT ON decasport.pedidos        TO 'deca_ventas'@'%';
+GRANT SELECT, INSERT ON decasport.lineas_pedido  TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.facturas       TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.clientes       TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.productos      TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.almacenes      TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.existencias    TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.presupuestos        TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.lineas_presupuesto  TO 'deca_ventas'@'%';
+
+-- Al aceptar un presupuesto solo puede cambiar su estado y enlazarlo con el pedido
+GRANT UPDATE (estado, pedido_id) ON decasport.presupuestos TO 'deca_ventas'@'%';
+
+GRANT SELECT ON decasport.v_pedidos_resumen TO 'deca_ventas'@'%';
+GRANT SELECT ON decasport.v_catalogo_movil  TO 'deca_ventas'@'%';
+
+GRANT EXECUTE ON PROCEDURE decasport.sp_crear_pedido    TO 'deca_ventas'@'%';
+GRANT EXECUTE ON PROCEDURE decasport.sp_facturar_pedido TO 'deca_ventas'@'%';
+GRANT EXECUTE ON FUNCTION  decasport.fn_total_pedido    TO 'deca_ventas'@'%';
+
+
+-- ==========================================================
+-- 4. INVENTARIO
+-- Gestiona almacenes y existencias, y registra la recepción
+-- de compras. Ve los pedidos para saber qué preparar.
+-- No toca precios, clientes ni facturas.
+-- ==========================================================
+
+GRANT SELECT, INSERT, UPDATE ON decasport.almacenes   TO 'deca_inventario'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.existencias TO 'deca_inventario'@'%';
+
+GRANT SELECT ON decasport.productos     TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.proveedores   TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.pedidos       TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.lineas_pedido TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.compras       TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.lineas_compra TO 'deca_inventario'@'%';
+
+-- Al recibir mercancía solo puede cambiar el estado de la compra y la fecha de recepción
+GRANT UPDATE (estado, fecha_recepcion) ON decasport.compras TO 'deca_inventario'@'%';
+
+GRANT SELECT ON decasport.v_stock_bajo     TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.v_catalogo_movil TO 'deca_inventario'@'%';
+
+
+-- ==========================================================
+-- 5. FABRICACIÓN
+-- La base de datos todavía no tiene tablas de fabricación
+-- (órdenes, listas de materiales), así que por ahora solo
+-- puede CONSULTAR productos y existencias.
+-- Cuando se creen esas tablas, se le darán permisos sobre ellas.
+-- ==========================================================
+
+GRANT SELECT ON decasport.productos     TO 'deca_fabricacion'@'%';
+GRANT SELECT ON decasport.almacenes     TO 'deca_fabricacion'@'%';
+GRANT SELECT ON decasport.existencias   TO 'deca_fabricacion'@'%';
+GRANT SELECT ON decasport.v_stock_bajo  TO 'deca_fabricacion'@'%';
+
+
+-- ==========================================================
+-- 6. COMPRAS
+-- Gestiona proveedores y pedidos de compra. Consulta productos
+-- y stock para decidir qué reponer. No ve clientes ni ventas.
+-- ==========================================================
+
+GRANT SELECT, INSERT, UPDATE ON decasport.proveedores TO 'deca_compras'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.compras     TO 'deca_compras'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON decasport.lineas_compra TO 'deca_compras'@'%';
+
+GRANT SELECT ON decasport.productos    TO 'deca_compras'@'%';
+GRANT SELECT ON decasport.almacenes    TO 'deca_compras'@'%';
+GRANT SELECT ON decasport.existencias  TO 'deca_compras'@'%';
+GRANT SELECT ON decasport.v_stock_bajo TO 'deca_compras'@'%';
+
+
+-- ==========================================================
+-- 7. COMPROBACIÓN
+-- ==========================================================
+
+-- Debe listar los 5 usuarios
+SELECT user, host
+  FROM mysql.user
+ WHERE user IN ('deca_crm','deca_ventas','deca_inventario','deca_fabricacion','deca_compras')
+ ORDER BY user;
+
+GRANT SELECT, INSERT, UPDATE ON decasport.clientes           TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.interacciones      TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.oportunidades      TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.presupuestos       TO 'deca_crm'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON decasport.lineas_presupuesto TO 'deca_crm'@'%';
+ 
+-- Necesita ver el catálogo para presupuestar
+GRANT SELECT ON decasport.productos             TO 'deca_crm'@'%';
+GRANT SELECT ON decasport.v_pipeline_crm        TO 'deca_crm'@'%';
+GRANT SELECT ON decasport.v_presupuestos_resumen TO 'deca_crm'@'%';
+GRANT SELECT ON decasport.v_catalogo_movil      TO 'deca_crm'@'%';
+ 
+ 
+-- ==========================================================
+-- 3. VENTAS
+-- Crea pedidos y los factura. Consulta clientes, presupuestos
+-- y stock, pero no modifica clientes ni inventario.
+-- ==========================================================
+ 
+GRANT SELECT, INSERT ON decasport.pedidos        TO 'deca_ventas'@'%';
+GRANT SELECT, INSERT ON decasport.lineas_pedido  TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.facturas       TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.clientes       TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.productos      TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.almacenes      TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.existencias    TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.presupuestos        TO 'deca_ventas'@'%';
+GRANT SELECT         ON decasport.lineas_presupuesto  TO 'deca_ventas'@'%';
+ 
+-- Al aceptar un presupuesto solo puede cambiar su estado y enlazarlo con el pedido
+GRANT UPDATE (estado, pedido_id) ON decasport.presupuestos TO 'deca_ventas'@'%';
+ 
+GRANT SELECT ON decasport.v_pedidos_resumen TO 'deca_ventas'@'%';
+GRANT SELECT ON decasport.v_catalogo_movil  TO 'deca_ventas'@'%';
+ 
+GRANT EXECUTE ON PROCEDURE decasport.sp_crear_pedido    TO 'deca_ventas'@'%';
+GRANT EXECUTE ON PROCEDURE decasport.sp_facturar_pedido TO 'deca_ventas'@'%';
+GRANT EXECUTE ON FUNCTION  decasport.fn_total_pedido    TO 'deca_ventas'@'%';
+ 
+ 
+-- ==========================================================
+-- 4. INVENTARIO
+-- Gestiona almacenes y existencias, y registra la recepción
+-- de compras. Ve los pedidos para saber qué preparar.
+-- No toca precios, clientes ni facturas.
+-- ==========================================================
+ 
+GRANT SELECT, INSERT, UPDATE ON decasport.almacenes   TO 'deca_inventario'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.existencias TO 'deca_inventario'@'%';
+ 
+GRANT SELECT ON decasport.productos     TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.proveedores   TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.pedidos       TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.lineas_pedido TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.compras       TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.lineas_compra TO 'deca_inventario'@'%';
+ 
+-- Al recibir mercancía solo puede cambiar el estado de la compra y la fecha de recepción
+GRANT UPDATE (estado, fecha_recepcion) ON decasport.compras TO 'deca_inventario'@'%';
+ 
+GRANT SELECT ON decasport.v_stock_bajo     TO 'deca_inventario'@'%';
+GRANT SELECT ON decasport.v_catalogo_movil TO 'deca_inventario'@'%';
+ 
+ 
+-- ==========================================================
+-- 5. FABRICACIÓN
+-- La base de datos todavía no tiene tablas de fabricación
+-- (órdenes, listas de materiales), así que por ahora solo
+-- puede CONSULTAR productos y existencias.
+-- Cuando se creen esas tablas, se le darán permisos sobre ellas.
+-- ==========================================================
+ 
+GRANT SELECT ON decasport.productos     TO 'deca_fabricacion'@'%';
+GRANT SELECT ON decasport.almacenes     TO 'deca_fabricacion'@'%';
+GRANT SELECT ON decasport.existencias   TO 'deca_fabricacion'@'%';
+GRANT SELECT ON decasport.v_stock_bajo  TO 'deca_fabricacion'@'%';
+ 
+ 
+-- ==========================================================
+-- 6. COMPRAS
+-- Gestiona proveedores y pedidos de compra. Consulta productos
+-- y stock para decidir qué reponer. No ve clientes ni ventas.
+-- ==========================================================
+ 
+GRANT SELECT, INSERT, UPDATE ON decasport.proveedores TO 'deca_compras'@'%';
+GRANT SELECT, INSERT, UPDATE ON decasport.compras     TO 'deca_compras'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON decasport.lineas_compra TO 'deca_compras'@'%';
+ 
+GRANT SELECT ON decasport.productos    TO 'deca_compras'@'%';
+GRANT SELECT ON decasport.almacenes    TO 'deca_compras'@'%';
+GRANT SELECT ON decasport.existencias  TO 'deca_compras'@'%';
+GRANT SELECT ON decasport.v_stock_bajo TO 'deca_compras'@'%';
+ 
+ 
+-- ==========================================================
+-- 7. COMPROBACIÓN
+-- ==========================================================
+ 
+-- Debe listar los 5 usuarios
+SELECT user, host
+  FROM mysql.user
+ WHERE user IN ('deca_crm','deca_ventas','deca_inventario','deca_fabricacion','deca_compras')
+ ORDER BY user;
+ 
+-- Permisos de cada uno (ejecuta de uno en uno)
+-- SHOW GRANTS FOR 'deca_crm'@'%';
+-- SHOW GRANTS FOR 'deca_ventas'@'%';
+-- SHOW GRANTS FOR 'deca_inventario'@'%';
+-- SHOW GRANTS FOR 'deca_fabricacion'@'%';
+-- SHOW GRANTS FOR 'deca_compras'@'%';
