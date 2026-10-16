@@ -172,7 +172,6 @@ public class Main {
         return false;
     }
 }
-
 // aplicacion = funciona;
 // estetica = bonito;
 // funciones = muchas;
