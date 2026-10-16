@@ -1,5 +1,8 @@
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -7,6 +10,11 @@ import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Scanner;
 public class Main {
+    
+    private static String usuario;
+    private static String contraseña;
+    private static String url;
+    
     public void main(String[] args) {
         Properties p = new Properties();
         try (InputStream in = Main.class.getClassLoader().getResourceAsStream("config.properties")) {
@@ -23,14 +31,15 @@ public class Main {
     private void iniciarSesion(Scanner scanner, Properties p) {
         while (true) { 
             System.out.println("====== INCIAR SESIÓN ======");
-            String usuario = leerString(scanner, "Usuario: ");
-            String contraseña = leerString(scanner, "Contraseña: ");
+            usuario = leerString(scanner, "Usuario: ");
+            contraseña = leerString(scanner, "Contraseña: ");
+            url = p.getProperty("db.url");
             if (p.getProperty(usuario) == null) {
                 System.out.println("Error: Usuario introducido no existe");
             } else if (!p.getProperty(usuario).equals(contraseña)) {
                 System.out.println("Error: Contraseña incorrecta");
             } else {
-                mostarMenu(scanner, usuario, contraseña, p.getProperty("db.url"));
+                mostarMenu(scanner, usuario, contraseña, url);
                 break;
             }
         }
@@ -40,8 +49,8 @@ public class Main {
     public static void mostarMenu(Scanner scanner, String usuario, String contraseña, String url) {
         int opcion;
         do {
-            System.out.println("====== MENU ====== ");
-            System.out.println("1. CRM");
+            System.out.println("====== MENU ======");
+            System.out.println("2. Ventas");
             System.out.println("0. Salir");
             opcion = leerInt(scanner, "> ");
             ejecutar(usuario, contraseña, url, opcion);
@@ -50,11 +59,11 @@ public class Main {
     
     private static void ejecutar(String usuario, String contraseña, String url, int opcion) {
         switch (opcion) {
-            case 1 -> {
-                if (usuario.equals("deca_crm")) {
-                    Crm crm = new Crm(usuario, contraseña, url);
-                    crm.cargarCrm(usuario, contraseña, url);
-                } else { System.out.println("Error: Usuario actual no tiene permisos para entrar"); }
+            case 2 -> {
+                if (usuario.equals("deca_ventas") || usuario.equals("deca_admin")) {
+                    Ventas ventas = new Ventas(usuario, contraseña, url);
+                    ventas.cargarVentas(usuario, contraseña, url);
+                }
             }
             case 0 -> System.exit(0);
             default -> System.out.println("Error: Opción introducida incorrecta");
@@ -141,6 +150,19 @@ public class Main {
                 return Integer.parseInt(entrada);
             } catch (NumberFormatException e) {System.out.println("Error:" + e.getMessage());}
         }
+    }
+    
+    public static Boolean verificarId(int id, String tabla) {
+        try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+            PreparedStatement st = conn.prepareStatement("SELECT * FROM " + tabla + " WHERE id = ?");
+            st.setInt(1, id);
+            
+            ResultSet rs = st.executeQuery();
+            return rs.isBeforeFirst();
+        } catch (SQLException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        return false;
     }
 }
 
