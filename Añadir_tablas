@@ -1,0 +1,140 @@
+USE decasport;
+
+-- ==========================================================
+-- 1. ALMACENES
+-- ==========================================================
+
+CREATE TABLE almacenes (
+    id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    codigo    VARCHAR(20)  NOT NULL,
+    nombre    VARCHAR(100) NOT NULL,
+    direccion VARCHAR(200) NULL,
+    ciudad    VARCHAR(60)  NOT NULL,
+    pais      CHAR(2)      NOT NULL,
+    activo    BOOLEAN      NOT NULL DEFAULT TRUE,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_almacenes_codigo (codigo)
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 2. EXISTENCIAS
+-- Una fila por producto y almacén.
+-- ==========================================================
+
+CREATE TABLE existencias (
+    almacen_id   INT UNSIGNED NOT NULL,
+    producto_id  INT UNSIGNED NOT NULL,
+    cantidad     INT          NOT NULL DEFAULT 0,
+    stock_minimo INT          NOT NULL DEFAULT 10,
+
+    PRIMARY KEY (almacen_id, producto_id),
+
+    CONSTRAINT fk_existencias_almacen
+        FOREIGN KEY (almacen_id)
+        REFERENCES almacenes (id),
+
+    CONSTRAINT fk_existencias_producto
+        FOREIGN KEY (producto_id)
+        REFERENCES productos (id),
+
+    CONSTRAINT ck_existencias_cantidad
+        CHECK (cantidad >= 0),
+
+    CONSTRAINT ck_existencias_stock_minimo
+        CHECK (stock_minimo >= 0)
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 3. COMPRAS
+-- Cabecera del pedido realizado a un proveedor.
+-- almacen_id indica dónde se recibirá la mercancía.
+-- ==========================================================
+
+CREATE TABLE compras (
+    id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    proveedor_id   INT UNSIGNED NOT NULL,
+    almacen_id     INT UNSIGNED NOT NULL,
+    fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_prevista DATE         NULL,
+    fecha_recepcion DATETIME    NULL,
+    estado         ENUM(
+                       'borrador',
+                       'pendiente',
+                       'recibida',
+                       'cancelada'
+                   ) NOT NULL DEFAULT 'borrador',
+    observaciones  VARCHAR(500) NULL,
+
+    PRIMARY KEY (id),
+
+    CONSTRAINT fk_compras_proveedor
+        FOREIGN KEY (proveedor_id)
+        REFERENCES proveedores (id),
+
+    CONSTRAINT fk_compras_almacen
+        FOREIGN KEY (almacen_id)
+        REFERENCES almacenes (id),
+
+    CONSTRAINT ck_compras_recepcion_estado
+        CHECK (
+            (estado = 'recibida' AND fecha_recepcion IS NOT NULL)
+            OR
+            (estado <> 'recibida' AND fecha_recepcion IS NULL)
+        )
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 4. LÍNEAS DE COMPRA
+-- Detalle de productos, cantidades y coste de adquisición.
+-- El coste es distinto del precio de venta del producto.
+-- ==========================================================
+
+CREATE TABLE lineas_compra (
+    id             INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    compra_id      INT UNSIGNED  NOT NULL,
+    producto_id    INT UNSIGNED  NOT NULL,
+    cantidad       INT           NOT NULL,
+    coste_unitario DECIMAL(10,2) NOT NULL,
+
+    PRIMARY KEY (id),
+
+    UNIQUE KEY uq_lineas_compra_producto (
+        compra_id,
+        producto_id
+    ),
+
+    CONSTRAINT fk_lineas_compra_compra
+        FOREIGN KEY (compra_id)
+        REFERENCES compras (id),
+
+    CONSTRAINT fk_lineas_compra_producto
+        FOREIGN KEY (producto_id)
+        REFERENCES productos (id),
+
+    CONSTRAINT ck_lineas_compra_cantidad
+        CHECK (cantidad > 0),
+
+    CONSTRAINT ck_lineas_compra_coste
+        CHECK (coste_unitario >= 0)
+) ENGINE=InnoDB;
+
+
+-- ==========================================================
+-- 5. COMPROBACIÓN
+-- Deben aparecer las cuatro tablas.
+-- ==========================================================
+
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'decasport'
+  AND table_name IN (
+      'almacenes',
+      'existencias',
+      'compras',
+      'lineas_compra'
+  )
+ORDER BY table_name;
