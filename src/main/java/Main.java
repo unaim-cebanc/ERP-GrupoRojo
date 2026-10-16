@@ -143,7 +143,6 @@ public class Main {
         }
     }
 }
-
 // aplicacion = funciona;
 // estetica = bonito;
 // funciones = muchas;
