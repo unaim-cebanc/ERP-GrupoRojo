@@ -50,6 +50,7 @@ public class Main {
         int opcion;
         do {
             System.out.println("====== MENU ======");
+            System.out.println("1. CRM");
             System.out.println("2. Ventas");
             System.out.println("0. Salir");
             opcion = leerInt(scanner, "> ");
@@ -59,6 +60,12 @@ public class Main {
     
     private static void ejecutar(String usuario, String contraseña, String url, int opcion) {
         switch (opcion) {
+            case 1 -> {
+                if (usuario.equals("deca_crm") || usuario.equals("deca_admin")) {
+                    Ventas ventas = new Ventas(usuario, contraseña, url);
+                    ventas.cargarVentas(usuario, contraseña, url);
+                }
+            }
             case 2 -> {
                 if (usuario.equals("deca_ventas") || usuario.equals("deca_admin")) {
                     Ventas ventas = new Ventas(usuario, contraseña, url);
