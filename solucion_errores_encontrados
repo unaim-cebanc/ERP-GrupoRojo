@@ -1,0 +1,160 @@
+USE decasport;
+
+-- ==========================================================
+-- 1. ALMACENES (si ya existen con ese código, no se duplican)
+-- ==========================================================
+
+INSERT IGNORE INTO almacenes (codigo, nombre, ciudad, pais) VALUES
+ ('IRN', 'Almacén Irun',     'Irun',     'ES'),
+ ('ZGZ', 'Almacén Zaragoza', 'Zaragoza', 'ES');
+
+
+-- ==========================================================
+-- 2. MIGRAR EL STOCK ACTUAL A EXISTENCIAS
+-- Todo el stock que había en productos pasa al almacén de Irun.
+-- ==========================================================
+
+INSERT IGNORE INTO existencias (almacen_id, producto_id, cantidad, stock_minimo)
+SELECT (SELECT id FROM almacenes WHERE codigo = 'IRN'), p.id, p.stock, 10
+  FROM productos p;
+
+-- Algo de stock en el segundo almacén, para tener datos en varios almacenes
+INSERT IGNORE INTO existencias (almacen_id, producto_id, cantidad, stock_minimo)
+SELECT (SELECT id FROM almacenes WHERE codigo = 'ZGZ'), p.id, x.cantidad, 10
+  FROM productos p
+  JOIN (SELECT 'RUN-ZAP-001' AS sku, 25 AS cantidad
+        UNION ALL SELECT 'MON-MOC-001', 20
+        UNION ALL SELECT 'FIT-MAN-001', 10
+        UNION ALL SELECT 'CIC-CAS-001', 12) x ON x.sku = p.sku;
+
+
+-- ==========================================================
+-- 3. PEDIDOS: cada pedido sale de un almacén
+-- Los pedidos que ya existen se asignan al almacén de Irun.
+-- ==========================================================
+
+ALTER TABLE pedidos
+    ADD COLUMN almacen_id INT UNSIGNED NULL AFTER cliente_id;
+
+UPDATE pedidos
+   SET almacen_id = (SELECT id FROM almacenes WHERE codigo = 'IRN')
+ WHERE id > 0 AND almacen_id IS NULL;
+
+ALTER TABLE pedidos
+    MODIFY almacen_id INT UNSIGNED NOT NULL,
+    ADD CONSTRAINT fk_pedidos_almacen
+        FOREIGN KEY (almacen_id)
+        REFERENCES almacenes (id);
+
+
+-- ==========================================================
+-- 4. TRIGGERS: ahora comprueban y descuentan en EXISTENCIAS
+-- ==========================================================
+
+DROP TRIGGER IF EXISTS trg_lineas_bi;
+DROP TRIGGER IF EXISTS trg_lineas_ai;
+
+DELIMITER $$
+
+-- Antes de insertar una línea: comprueba el stock del almacén del pedido
+-- y copia el precio del producto
+CREATE DEFINER = 'root'@'localhost' TRIGGER trg_lineas_bi
+BEFORE INSERT ON lineas_pedido FOR EACH ROW
+BEGIN
+  DECLARE v_precio  DECIMAL(10,2);
+  DECLARE v_almacen INT UNSIGNED;
+  DECLARE v_stock   INT DEFAULT 0;
+
+  SELECT precio INTO v_precio
+    FROM productos WHERE id = NEW.producto_id;
+  IF v_precio IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El producto no existe';
+  END IF;
+
+  SELECT almacen_id INTO v_almacen
+    FROM pedidos WHERE id = NEW.pedido_id;
+
+  SELECT cantidad INTO v_stock
+    FROM existencias
+   WHERE almacen_id = v_almacen AND producto_id = NEW.producto_id;
+
+  IF v_stock < NEW.cantidad THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Stock insuficiente en el almacen del pedido';
+  END IF;
+
+  SET NEW.precio_unitario = v_precio;
+END$$
+
+-- Después de insertar una línea: descuenta el stock del almacén del pedido
+CREATE DEFINER = 'root'@'localhost' TRIGGER trg_lineas_ai
+AFTER INSERT ON lineas_pedido FOR EACH ROW
+BEGIN
+  UPDATE existencias e
+    JOIN pedidos p ON p.id = NEW.pedido_id
+     SET e.cantidad = e.cantidad - NEW.cantidad
+   WHERE e.almacen_id = p.almacen_id
+     AND e.producto_id = NEW.producto_id;
+END$$
+
+DELIMITER ;
+
+
+-- ==========================================================
+-- 5. PROCEDIMIENTO: sp_crear_pedido ahora recibe el almacén
+-- (cambia la firma: cliente, almacén, OUT pedido)
+-- ==========================================================
+
+DROP PROCEDURE IF EXISTS sp_crear_pedido;
+
+DELIMITER $$
+
+CREATE DEFINER = 'root'@'localhost' PROCEDURE sp_crear_pedido(
+  IN  p_cliente_id INT,
+  IN  p_almacen_id INT,
+  OUT p_pedido_id  INT)
+BEGIN
+  INSERT INTO pedidos (cliente_id, almacen_id) VALUES (p_cliente_id, p_almacen_id);
+  SET p_pedido_id = LAST_INSERT_ID();
+END$$
+
+DELIMITER ;
+
+
+-- ==========================================================
+-- 6. VISTAS: leen de EXISTENCIAS
+-- ==========================================================
+
+-- Productos por debajo del stock mínimo, por almacén
+CREATE OR REPLACE DEFINER = 'root'@'localhost' SQL SECURITY DEFINER VIEW v_stock_bajo AS
+SELECT a.nombre AS almacen,
+       pr.sku,
+       pr.nombre AS producto,
+       e.cantidad,
+       e.stock_minimo,
+       pv.nombre AS proveedor
+  FROM existencias e
+  JOIN almacenes a    ON a.id = e.almacen_id
+  JOIN productos pr   ON pr.id = e.producto_id
+  JOIN proveedores pv ON pv.id = pr.proveedor_id
+ WHERE e.cantidad < e.stock_minimo;
+
+-- Catálogo para la app móvil: stock = suma de todos los almacenes
+CREATE OR REPLACE DEFINER = 'root'@'localhost' SQL SECURITY DEFINER VIEW v_catalogo_movil AS
+SELECT pr.sku,
+       pr.nombre,
+       pr.categoria,
+       pr.precio,
+       COALESCE(SUM(e.cantidad), 0) AS stock
+  FROM productos pr
+  LEFT JOIN existencias e ON e.producto_id = pr.id
+ GROUP BY pr.id, pr.sku, pr.nombre, pr.categoria, pr.precio;
+
+
+-- ==========================================================
+-- 7. ELIMINAR EL STOCK DUPLICADO DE PRODUCTOS
+-- Se hace al final, cuando nada depende ya de esa columna.
+-- ==========================================================
+
+ALTER TABLE productos DROP CHECK ck_productos_stock;
+ALTER TABLE productos DROP COLUMN stock;
+
