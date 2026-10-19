@@ -52,6 +52,7 @@ public class Main {
             System.out.println("====== MENU ======");
             System.out.println("1. CRM");
             System.out.println("2. Ventas");
+            System.out.println("3. Compras");
             System.out.println("0. Salir");
             opcion = leerInt(scanner, "> ");
             ejecutar(usuario, contraseña, url, opcion);
@@ -70,6 +71,12 @@ public class Main {
                 if (usuario.equals("deca_ventas") || usuario.equals("deca_admin")) {
                     Ventas ventas = new Ventas(usuario, contraseña, url);
                     ventas.cargarVentas(usuario, contraseña, url);
+                }
+            }
+            case 3 -> {
+                if (usuario.equals("deca_compras") || usuario.equals("deca_admin")) {
+                    Compra compra = new Compra(usuario, contraseña, url);
+                    compra.cargarCompra(usuario, contraseña, url);
                 }
             }
             case 0 -> System.exit(0);
