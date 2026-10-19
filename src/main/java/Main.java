@@ -30,7 +30,7 @@ public class Main {
     
     private void iniciarSesion(Scanner scanner, Properties p) {
         while (true) { 
-            System.out.println("====== INCIAR SESIÓN ======");
+            System.out.println("\n====== INCIAR SESIÓN ======");
             usuario = leerString(scanner, "Usuario: ");
             contraseña = leerString(scanner, "Contraseña: ");
             url = p.getProperty("db.url");
@@ -49,7 +49,7 @@ public class Main {
     public static void mostarMenu(Scanner scanner, String usuario, String contraseña, String url) {
         int opcion;
         do {
-            System.out.println("====== MENU ======");
+            System.out.println("\n====== MENU ======");
             System.out.println("1. CRM");
             System.out.println("2. Ventas");
             System.out.println("3. Compras");
@@ -179,6 +179,7 @@ public class Main {
         return false;
     }
 }
+
 // aplicacion = funciona;
 // estetica = bonito;
 // funciones = muchas;
