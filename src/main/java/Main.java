@@ -66,19 +66,25 @@ public class Main {
                 if (usuario.equals("deca_crm") || usuario.equals("deca_admin")) {
                     Ventas ventas = new Ventas(usuario, contraseña, url);
                     ventas.cargarVentas(usuario, contraseña, url);
-                }
+                } else { System.out.println("Error: Acceso denegado"); }
             }
             case 2 -> {
                 if (usuario.equals("deca_ventas") || usuario.equals("deca_admin")) {
                     Ventas ventas = new Ventas(usuario, contraseña, url);
                     ventas.cargarVentas(usuario, contraseña, url);
-                }
+                } else { System.out.println("Error: Acceso denegado"); }
             }
             case 3 -> {
                 if (usuario.equals("deca_compras") || usuario.equals("deca_admin")) {
                     Compra compra = new Compra(usuario, contraseña, url);
                     compra.cargarCompra(usuario, contraseña, url);
-                }
+                } else { System.out.println("Error: Acceso denegado"); }
+            }
+            case 4 -> {
+                if (usuario.equals("deca_inventario") || usuario.equals("deca_admin")) {
+                    Inventario inventario = new Inventario(url, usuario, contraseña);
+                    inventario.cargarInventario(url, usuario, contraseña);
+                } else { System.out.println("Error: Acceso denegado"); }
             }
             case 0 -> System.exit(0);
             default -> System.out.println("Error: Opción introducida incorrecta");

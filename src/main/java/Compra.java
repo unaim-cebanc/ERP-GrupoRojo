@@ -78,32 +78,16 @@ public class Compra {
         while (true) { 
             System.out.println("====== Confirmar Presupusto ======\n");
             int id = Main.leerInt(sc, "Introduce el id del presupuesto a confirmar: ");
-            System.out.println("Se establecerá el estado del presupuesto " + id + " como 'recibida'");
+            System.out.println("Se establecerá el estado del presupuesto " + id + " como 'confirmada'");
             String conf = Main.leerString(sc, "Seguro que quieres proceder? (y/n): ");
             
             switch (conf) {
                 case "y" -> {
                     if (Main.verificarId(id, "compras")) {
                         try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                            PreparedStatement st = conn.prepareStatement("UPDATE compras SET estado = 'recibida', fecha_recepcion = NOW() WHERE id = ?");
+                            PreparedStatement st = conn.prepareStatement("UPDATE compras SET estado = 'confirmada', fecha_confirmacion = NOW() WHERE id = ?");
                             st.setInt(1, id);
                             st.executeUpdate();
-                            
-                            PreparedStatement st2 = conn.prepareStatement("SELECT producto_id, cantidad FROM lineas_compra WHERE compra_id = ?");
-                            st2.setInt(1, id);
-                            ResultSet rs = st2.executeQuery();
-                            if (rs.next()) {
-                                int idProducto = rs.getInt("producto_id");
-                                int cantidad = rs.getInt("cantidad");
-                                
-                                PreparedStatement st3 = conn.prepareStatement("UPDATE existencias SET cantidad = cantidad + ? WHERE producto_id = ?");
-                                st3.setInt(1, cantidad);
-                                st3.setInt(2, idProducto);
-                                st3.executeUpdate();
-                            } else {
-                                System.out.println("Error: No se ha encontrado el producto asociado al presupuesto");
-                                return;
-                            }
                             
                             System.out.println("Operación realizada con éxito");
                             return;
