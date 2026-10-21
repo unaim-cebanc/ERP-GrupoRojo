@@ -16,6 +16,7 @@ public class Main {
     private static String url;
     
     public void main(String[] args) {
+        logo();
         Properties p = new Properties();
         try (InputStream in = Main.class.getClassLoader().getResourceAsStream("config.properties")) {
             p.load(in);
@@ -177,6 +178,14 @@ public class Main {
             System.out.println("Error: " + e.getMessage());
         }
         return false;
+    }
+    private void logo() {
+        System.out.println("██████╗ ███████╗ ██████╗ █████╗     ███████╗██████╗  ██████╗ ██████╗ ████████╗");
+        System.out.println("██╔══██╗██╔════╝██╔════╝██╔══██╗    ██╔════╝██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝");
+        System.out.println("██║  ██║█████╗  ██║     ███████║    ███████╗██████╔╝██║   ██║██████╔╝   ██║");
+        System.out.println("██║  ██║██╔══╝  ██║     ██╔══██║    ╚════██║██╔═══╝ ██║   ██║██╔══██╗   ██║");
+        System.out.println("██████╔╝███████╗╚██████╗██║  ██║    ███████║██║     ╚██████╔╝██║  ██║   ██║");
+        System.out.println("╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝    ╚══════╝╚═╝      ╚═════╝ ╚═╝  ╚═╝   ╚═╝");
     }
 }
 
