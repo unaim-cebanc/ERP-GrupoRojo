@@ -1,13 +1,16 @@
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
-import  java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
-import java.util.TreeMap;
 
 public class Inventario {
     private final String url;
@@ -41,7 +44,6 @@ public class Inventario {
         System.out.println("0. Volver");
     }
     
-
     private void ejecutarInventario(Scanner sc, int opcion) {
         switch (opcion) {
             case 1 -> mostrarInventario();
@@ -71,7 +73,6 @@ public class Inventario {
             default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
-    
     
     private void mostrarInventario() {
         try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
@@ -358,91 +359,209 @@ public class Inventario {
             System.out.println("Error: " + e.getMessage());
         }
     }
+    record Componente(int id, int idProveedor, BigDecimal costo, int necesaria, int disponible) {
+        int faltante() { return necesaria - disponible; }
+    }
     
     private void confirmarFabricacion(Scanner sc) {
-        while (true) { 
-            System.out.println("\n====== Confirmar OF ======");
-            int id = Main.leerInt(sc, "Introduce el id de la OF a confirmar: ");
-            String conf = Main.leerString(sc, "Seguro que quieres confirmar la OF con id " + id + "? (y/n): ");
-            switch (conf) {
-                case "y" -> {
-                    try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                        PreparedStatement st = conn.prepareStatement("UPDATE ordenes_fabricacion SET estado = 'terminada', fecha_fin = NOW() WHERE id = ?");
-                        st.setInt(1, id);
-                        st.executeUpdate();
-                        
-                        PreparedStatement st2 = conn.prepareStatement("SELECT producto_id, cantidad FROM ordenes_fabricacion WHERE id = ?");
-                        st2.setInt(1, id);
-                        ResultSet rs = st2.executeQuery();
-                        
-                        if (rs.isBeforeFirst()) {
-                            int idProducto = rs.getInt("producto_id");
-                            int cantidadOrden = rs.getInt("cantidad");
-                            
-                            PreparedStatement st3 = conn.prepareStatement("SELECT componenete_id, cantidad FROM lista_materiales WHERE producto_id = ?");
-                            st3.setInt(1, idProducto);
-                            ResultSet rs2 = st3.executeQuery();
-                            
-                            TreeMap<Integer, Integer> materialesNecesarios = new TreeMap<>();
-                            while (rs2.next()) {
-                                materialesNecesarios.put(rs2.getInt("componente_id"), rs2.getInt("cantidad") * cantidadOrden);
-                            }
-                            
-                            for (Map.Entry<Integer, Integer> material : materialesNecesarios.entrySet()) {
-                                int idComponente = material.getKey();
-                                int cantidad = material.getValue();
-                                
-                                PreparedStatement st4 = conn.prepareStatement("UPDATE existencias SET cantidad = cantidad - ? WHERE producto_id = ?");
-                                st4.setInt(1, cantidad);
-                                st4.setInt(2, idComponente);
-                                st4.executeUpdate();
-                            }
-                            
-                            PreparedStatement st5 = conn.prepareStatement("UPDATE existencias SET cantidad = cantidad + ? WHERE producto_id = ?");
-                            st5.setInt(1, cantidadOrden);
-                            st5.setInt(2, idProducto);
-                            st5.executeUpdate();
-                            
-                            PreparedStatement st6 = conn.prepareStatement("""
-                                SELECT p.id FROM pedidos AS p
-                                INNER JOIN lineas_pedido AS lp ON lp.pedido_id = p.id
-                                INNER JOIN productos AS pr ON pr.id = lp.producto_id
-                                INNER JOIN ordenes_fabricacion AS f ON f.producto_id = pr.id
-                                WHERE f.producto_id = lp.producto_id;
-                            """);
-                            
-                            ResultSet rs3 = st6.executeQuery();
-                            
-                            if (rs3.next()) {
-                                int idPedido = rs3.getInt("id");
-                                PreparedStatement st7 = conn.prepareStatement("""
-                                    INSERT INTO entregas (pedido_id, producto_id, cantidad_entregada, estado)
-                                    VALUES (?, ?, ?, ?, ?)
-                                """);
-                                st7.setInt(1, idPedido);
-                                st7.setInt(2, idProducto);
-                                st7.setInt(3, cantidadOrden);
-                                st7.setString(4, "enviada");
-                                
-                                st7.executeUpdate();
-                            }
-                        } else {
-                            System.out.println("Error: No se han encontrado los datos relacionados con la recepcion " + id);
-                            return;
-                        }
-                        System.out.println("Operación realizada con éxito");
-                        return;
-                    } catch (SQLException e) {
-                        System.out.println("Error: " + e.getMessage());
-                        return;
-                    }
+        System.out.println("\n====== Confirmar OF ======");
+        int id = Main.leerInt(sc, "Introduce el id de la OF a confirmar: ");
+        
+        String conf;
+        do {
+            conf = Main.leerString(sc, "Seguro que quieres confirmar la OF con id " + id + "? (y/n): ").trim().toLowerCase();
+            if (!conf.equals("y") && !conf.equals("n")) {
+                System.out.println("Error: Opción introducida incorrecta");
+            }
+        } while (!conf.equals("y") && !conf.equals("n"));
+        
+        if (conf.equals("n")) {
+            System.out.println("Operación cancelada");
+            return;
+        }
+        
+        try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+            conn.setAutoCommit(false);
+            try {
+                procesarOF(conn, id);
+                conn.commit();
+            } catch (SQLException | IllegalStateException e) {
+                conn.rollback();
+                System.out.println("Error: " + e.getMessage());
+            }
+        } catch (SQLException e) {
+            System.out.println("Error de conexión: " + e.getMessage());
+        }
+    }
+    
+    private void procesarOF(Connection conn, int idOF) throws SQLException {
+        int idProducto;
+        int idAlmacen;
+        int cantidadOrden;
+        try (PreparedStatement st = conn.prepareStatement(
+                "SELECT producto_id, almacen_id, cantidad, estado FROM ordenes_fabricacion WHERE id = ? FOR UPDATE")) {
+            st.setInt(1, idOF);
+            try (ResultSet rs = st.executeQuery()) {
+                if (!rs.next()) {
+                    throw new IllegalStateException("La OF " + idOF + " no existe");
                 }
-                case "n" -> {
-                    System.out.println("Operación cancelada");
-                    return;
+                if ("terminada".equals(rs.getString("estado"))) {
+                    throw new IllegalStateException("La OF ya estaba terminada");
                 }
-                default -> System.out.println("Error: Opción introducida incorrecta");
+                idProducto = rs.getInt("producto_id");
+                idAlmacen = rs.getInt("almacen_id");
+                cantidadOrden = rs.getInt("cantidad");
             }
         }
+        
+        List<Componente> componentes = new ArrayList<>();
+        String sql = """
+            SELECT lm.componente_id, pr.proveedor_id, pr.costo, lm.cantidad * ? AS necesaria,
+            COALESCE(e.cantidad, 0) AS disponible
+            FROM lista_materiales AS lm
+            INNER JOIN productos AS pr ON pr.id = lm.componente_id
+            LEFT JOIN existencias AS e ON e.producto_id = lm.componente_id AND e.almacen_id = ?
+            WHERE lm.producto_id = ?
+            FOR UPDATE OF e
+        """;
+        try (PreparedStatement st = conn.prepareStatement(sql)) {
+            st.setInt(1, cantidadOrden);
+            st.setInt(2, idAlmacen);
+            st.setInt(3, idProducto);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    componentes.add(new Componente(
+                        rs.getInt("componente_id"),
+                        rs.getInt("proveedor_id"),
+                        rs.getBigDecimal("costo"),
+                        rs.getInt("necesaria"),
+                        rs.getInt("disponible")));
+                }
+            }
+        }
+        
+        if (componentes.isEmpty()) {
+            throw new IllegalStateException("El producto " + idProducto + " no tiene lista de materiales");
+        }
+        
+        List<Componente> faltantes = new ArrayList<>();
+        for (Componente c : componentes) {
+            if (c.faltante() > 0) {
+                faltantes.add(c);
+            }
+        }
+        
+        if (faltantes.isEmpty()) {
+            terminarOF(conn, idOF, idProducto, idAlmacen, cantidadOrden, componentes);
+        } else {
+            crearCompraPorFaltantes(conn, idOF, idAlmacen, faltantes);
+        }
+    }
+    
+    private void terminarOF(Connection conn, int idOF, int idProducto, int idAlmacen,
+        int cantidadOrden, List<Componente> componentes) throws SQLException {
+        
+            try (PreparedStatement st = conn.prepareStatement(
+                "UPDATE existencias SET cantidad = cantidad - ? WHERE almacen_id = ? AND producto_id = ?")) {
+            for (Componente c : componentes) {
+                st.setInt(1, c.necesaria());
+                st.setInt(2, idAlmacen);
+                st.setInt(3, c.id());
+                st.addBatch();
+            }
+            st.executeBatch();
+        }
+        
+        try (PreparedStatement st = conn.prepareStatement(
+                "UPDATE existencias SET cantidad = cantidad + ? WHERE almacen_id = ? AND producto_id = ?")) {
+            st.setInt(1, cantidadOrden);
+            st.setInt(2, idAlmacen);
+            st.setInt(3, idProducto);
+            if (st.executeUpdate() == 0) {
+                try (PreparedStatement ins = conn.prepareStatement(
+                        "INSERT INTO existencias (almacen_id, producto_id, cantidad) VALUES (?, ?, ?)")) {
+                    ins.setInt(1, idAlmacen);
+                    ins.setInt(2, idProducto);
+                    ins.setInt(3, cantidadOrden);
+                    ins.executeUpdate();
+                }
+            }
+        }
+        
+        try (PreparedStatement st = conn.prepareStatement(
+                "UPDATE ordenes_fabricacion SET estado = 'terminada', fecha_fin = NOW() WHERE id = ?")) {
+            st.setInt(1, idOF);
+            st.executeUpdate();
+        }
+        
+        try (PreparedStatement st = conn.prepareStatement("""
+                SELECT p.id FROM pedidos AS p
+                INNER JOIN lineas_pedido AS lp ON lp.pedido_id = p.id
+                WHERE lp.producto_id = ?
+                ORDER BY p.fecha ASC
+                LIMIT 1
+                """)) {
+            st.setInt(1, idProducto);
+            try (ResultSet rs = st.executeQuery()) {
+                if (rs.next()) {
+                    try (PreparedStatement ins = conn.prepareStatement(
+                            "INSERT INTO entregas (pedido_id, producto_id, cantidad_entregada, estado) VALUES (?, ?, ?, ?)")) {
+                        ins.setInt(1, rs.getInt("id"));
+                        ins.setInt(2, idProducto);
+                        ins.setInt(3, cantidadOrden);
+                        ins.setString(4, "enviada");
+                        ins.executeUpdate();
+                    }
+                }
+            }
+        }
+        System.out.println("Operación realizada con éxito: OF " + idOF + " terminada");
+    }
+    
+    private void crearCompraPorFaltantes(Connection conn, int idOF, int idAlmacen,
+        List<Componente> faltantes) throws SQLException {
+        Map<Integer, List<Componente>> porProveedor = new HashMap<>();
+        for (Componente c : faltantes) {
+            porProveedor.computeIfAbsent(c.idProveedor(), k -> new ArrayList<>()).add(c);
+        }
+        
+        List<Integer> idsCompra = new ArrayList<>();
+        try (PreparedStatement stCompra = conn.prepareStatement(
+            "INSERT INTO compras (proveedor_id, almacen_id, observaciones) VALUES (?, ?, ?)",
+            Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement stLinea = conn.prepareStatement(
+            "INSERT INTO lineas_compra (compra_id, producto_id, cantidad, costo_unitario) VALUES (?, ?, ?, ?)")) {
+                for (Map.Entry<Integer, List<Componente>> entry : porProveedor.entrySet()) {
+                stCompra.setInt(1, entry.getKey());
+                stCompra.setInt(2, idAlmacen);
+                stCompra.setString(3, "Generada por falta de stock en la OF " + idOF);
+                stCompra.executeUpdate();
+                
+                int idCompra;
+                try (ResultSet keys = stCompra.getGeneratedKeys()) {
+                    if (!keys.next()) {
+                        throw new SQLException("No se pudo obtener el id de la compra");
+                    }
+                    idCompra = keys.getInt(1);
+                }
+                idsCompra.add(idCompra);
+                
+                for (Componente c : entry.getValue()) {
+                    stLinea.setInt(1, idCompra);
+                    stLinea.setInt(2, c.id());
+                    stLinea.setInt(3, c.faltante());   // solo lo que falta
+                    stLinea.setBigDecimal(4, c.costo());
+                    stLinea.addBatch();
+                }
+                stLinea.executeBatch();
+            }
+        }
+        System.out.println("\nNo hay stock suficiente. La OF " + idOF + " NO se ha confirmado.");
+        System.out.println("Componentes que faltan:");
+        for (Componente c : faltantes) {
+            System.out.println("  - Producto " + c.id() + ": necesarios " + c.necesaria()
+                + ", disponibles " + c.disponible() + ", faltan " + c.faltante());
+        }
+        System.out.println("Se han creado presupuestos de compra con id: " + idsCompra);
     }
 }
