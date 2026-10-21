@@ -54,6 +54,8 @@ public class Main {
             System.out.println("1. CRM");
             System.out.println("2. Ventas");
             System.out.println("3. Compras");
+            System.out.println("4. Inventario");
+            System.out.println("5. Fabricación");
             System.out.println("0. Salir");
             opcion = leerInt(scanner, "> ");
             ejecutar(usuario, contraseña, url, opcion);
@@ -84,6 +86,12 @@ public class Main {
                 if (usuario.equals("deca_inventario") || usuario.equals("deca_admin")) {
                     Inventario inventario = new Inventario(url, usuario, contraseña);
                     inventario.cargarInventario(url, usuario, contraseña);
+                } else { System.out.println("Error: Acceso denegado"); }
+            }
+            case 5 -> {
+                if (usuario.equals("deca_fabricacion") || usuario.equals("deca_admin")) {
+                    Fabricacion fabricacion = new Fabricacion(usuario, contraseña, url);
+                    fabricacion.cargarFabricacion(usuario, contraseña, url);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 0 -> System.exit(0);
