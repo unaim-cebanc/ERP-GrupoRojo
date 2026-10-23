@@ -23,14 +23,16 @@ public class Inventario {
         this.contraseña = contraseña;
     }
     
-    public void cargarInventario(String url, String usuario, String contraseña) {
-        try (Scanner sc = new Scanner(System.in)) {
+    public void cargarInventario(String url, String usuario, String contraseña, Scanner sc) {
+        try {
             int opcion;
             do {
                 menuInventario();
                 opcion = Main.leerInt(sc, "> ");
                 ejecutarInventario(sc, opcion);
             } while (opcion != 0);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
     
@@ -69,7 +71,7 @@ public class Inventario {
                 ejecutarFabricacion(sc, opcion);
                 } while (opcion != 0);
             }
-            case 0 -> Main.mostarMenu(sc, usuario, contraseña, url);
+            case 0 -> {}
             default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
@@ -98,7 +100,7 @@ public class Inventario {
                 ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                 int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                 
-                System.err.println("\n=== Inventario ===\n");
+                System.out.println("\n=== Inventario ===\n");
                 Main.imprimirLinea(cabeceras, anchos);
                 Main.imprimirSeparador(anchos);
                 for (String[] fila : filas) {
@@ -127,7 +129,7 @@ public class Inventario {
                     PreparedStatement st2 = conn.prepareStatement("UPDATE existencias SET cantidad = ? WHERE producto_id = ?");
                     st2.setInt(1, cantidad);
                     st2.setInt(2, id);
-                    st.executeUpdate();
+                    st2.executeUpdate();
                     return;
                 } else {
                     System.out.println("Error: No se ha encontrado el producto " + nombre);
@@ -153,7 +155,7 @@ public class Inventario {
         switch (opcion) {
             case 1 -> listarRecepciones();
             case 2 -> confirmarRecepcion(sc);
-            case 0 -> cargarInventario(url, usuario, contraseña);
+            case 0 -> {}
             default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
@@ -170,7 +172,7 @@ public class Inventario {
                 ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                 int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                 
-                System.err.println("\n=== Recepciones ===\n");
+                System.out.println("\n=== Recepciones ===\n");
                 Main.imprimirLinea(cabeceras, anchos);
                 Main.imprimirSeparador(anchos);
                 for (String[] fila : filas) {
@@ -200,7 +202,7 @@ public class Inventario {
                         st2.setInt(1, id);
                         ResultSet rs = st2.executeQuery();
                         
-                        if (rs.isBeforeFirst()) {
+                        if (rs.next()) {
                             int idProducto = rs.getInt("producto_id");
                             int cantidad = rs.getInt("cantidad_recibida");
                             
@@ -241,7 +243,7 @@ public class Inventario {
         switch (opcion) {
             case 1 -> listarEntregas();
             case 2 -> confirmarEntrega(sc);
-            case 0 -> cargarInventario(url, usuario, contraseña);
+            case 0 -> {}
             default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
@@ -258,7 +260,7 @@ public class Inventario {
                 ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                 int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                 
-                System.err.println("\n=== Entregas ===\n");
+                System.out.println("\n=== Entregas ===\n");
                 Main.imprimirLinea(cabeceras, anchos);
                 Main.imprimirSeparador(anchos);
                 for (String[] fila : filas) {
@@ -288,7 +290,7 @@ public class Inventario {
                         st2.setInt(1, id);
                         ResultSet rs = st2.executeQuery();
                         
-                        if (rs.isBeforeFirst()) {
+                        if (rs.next()) {
                             int idProducto = rs.getInt("producto_id");
                             int cantidad = rs.getInt("cantidad_entregada");
                             
@@ -329,7 +331,7 @@ public class Inventario {
         switch (opcion) {
             case 1 -> listarFabricacion();
             case 2 -> confirmarFabricacion(sc);
-            case 0 -> cargarInventario(url, usuario, contraseña);
+            case 0 -> {}
             default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
@@ -346,7 +348,7 @@ public class Inventario {
                 ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                 int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                 
-                System.err.println("\n=== OF ===\n");
+                System.out.println("\n=== OF ===\n");
                 Main.imprimirLinea(cabeceras, anchos);
                 Main.imprimirSeparador(anchos);
                 for (String[] fila : filas) {

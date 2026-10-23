@@ -15,13 +15,13 @@ public class Main {
     private static String contraseña;
     private static String url;
     
-    public void main(String[] args) {
+    public static void main(String[] args) {
         logo();
         Properties p = new Properties();
         try (InputStream in = Main.class.getClassLoader().getResourceAsStream("config.properties")) {
             p.load(in);
-        } catch (IOException e) {
-            System.err.println("Error al leer config.properties: " + e.getMessage());
+        } catch (IOException | NullPointerException e) {
+            System.out.println("Error al leer config.properties: " + e.getMessage());
         }
         try (Scanner sc = new Scanner(System.in)) {
             iniciarSesion(sc, p);
@@ -29,25 +29,25 @@ public class Main {
         }
     }
     
-    private void iniciarSesion(Scanner scanner, Properties p) {
+    private static void iniciarSesion(Scanner sc, Properties p) {
         while (true) { 
             System.out.println("\n====== INCIAR SESIÓN ======");
-            usuario = leerString(scanner, "Usuario: ");
-            contraseña = leerString(scanner, "Contraseña: ");
+            usuario = leerString(sc, "Usuario: ");
+            contraseña = leerString(sc, "Contraseña: ");
             url = p.getProperty("db.url");
             if (p.getProperty(usuario) == null) {
                 System.out.println("Error: Usuario introducido no existe");
             } else if (!p.getProperty(usuario).equals(contraseña)) {
                 System.out.println("Error: Contraseña incorrecta");
             } else {
-                mostarMenu(scanner, usuario, contraseña, url);
+                mostarMenu(sc, usuario, contraseña, url);
                 break;
             }
         }
         
     }
     
-    public static void mostarMenu(Scanner scanner, String usuario, String contraseña, String url) {
+    public static void mostarMenu(Scanner sc, String usuario, String contraseña, String url) {
         int opcion;
         do {
             System.out.println("\n====== MENU ======");
@@ -57,41 +57,41 @@ public class Main {
             System.out.println("4. Inventario");
             System.out.println("5. Fabricación");
             System.out.println("0. Salir");
-            opcion = leerInt(scanner, "> ");
-            ejecutar(usuario, contraseña, url, opcion);
+            opcion = leerInt(sc, "> ");
+            ejecutar(usuario, contraseña, url, opcion, sc);
         } while (opcion != 0);
     }
     
-    private static void ejecutar(String usuario, String contraseña, String url, int opcion) {
+    private static void ejecutar(String usuario, String contraseña, String url, int opcion, Scanner sc) {
         switch (opcion) {
             case 1 -> {
                 if (usuario.equals("deca_crm") || usuario.equals("deca_admin")) {
                     Crm crm = new Crm(usuario, contraseña, url);
-                    crm.cargarCrm(usuario, contraseña, url);
+                    crm.cargarCrm(usuario, contraseña, url, sc);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 2 -> {
                 if (usuario.equals("deca_ventas") || usuario.equals("deca_admin")) {
                     Ventas ventas = new Ventas(usuario, contraseña, url);
-                    ventas.cargarVentas(usuario, contraseña, url);
+                    ventas.cargarVentas(usuario, contraseña, url, sc);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 3 -> {
                 if (usuario.equals("deca_compras") || usuario.equals("deca_admin")) {
                     Compra compra = new Compra(usuario, contraseña, url);
-                    compra.cargarCompra(usuario, contraseña, url);
+                    compra.cargarCompra(usuario, contraseña, url, sc);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 4 -> {
                 if (usuario.equals("deca_inventario") || usuario.equals("deca_admin")) {
                     Inventario inventario = new Inventario(url, usuario, contraseña);
-                    inventario.cargarInventario(url, usuario, contraseña);
+                    inventario.cargarInventario(url, usuario, contraseña, sc);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 5 -> {
                 if (usuario.equals("deca_fabricacion") || usuario.equals("deca_admin")) {
                     Fabricacion fabricacion = new Fabricacion(usuario, contraseña, url);
-                    fabricacion.cargarFabricacion(usuario, contraseña, url);
+                    fabricacion.cargarFabricacion(usuario, contraseña, url, sc);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 0 -> System.exit(0);
@@ -165,16 +165,16 @@ public class Main {
         return anchos;
     }
     
-    public static String leerString(Scanner scanner, String mensaje) {
+    public static String leerString(Scanner sc, String mensaje) {
         System.out.print(mensaje);
-        String entrada = scanner.nextLine().trim();
+        String entrada = sc.nextLine().trim();
         return entrada;
     }
     
-    public static int leerInt(Scanner scanner, String mensaje) {
+    public static int leerInt(Scanner sc, String mensaje) {
         while (true) { 
             System.out.print(mensaje);
-            String entrada = scanner.nextLine().trim();
+            String entrada = sc.nextLine().trim();
             try {
                 return Integer.parseInt(entrada);
             } catch (NumberFormatException e) {System.out.println("Error:" + e.getMessage());}
@@ -193,7 +193,7 @@ public class Main {
         }
         return false;
     }
-    private void logo() {
+    private static void logo() {
         System.out.println("██████╗ ███████╗ ██████╗ █████╗     ███████╗██████╗  ██████╗ ██████╗ ████████╗");
         System.out.println("██╔══██╗██╔════╝██╔════╝██╔══██╗    ██╔════╝██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝");
         System.out.println("██║  ██║█████╗  ██║     ███████║    ███████╗██████╔╝██║   ██║██████╔╝   ██║");

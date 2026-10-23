@@ -19,12 +19,17 @@ public class Fabricacion {
         this.url = url;
     }
     
-    public void cargarFabricacion(String usuario, String contraseña, String url) {
-        try (Scanner sc = new Scanner(System.in)) {
-            menuFabricacion();
-            int opcion = Main.leerInt(sc, "> ");
-            ejecutarFabricacion(opcion, sc);
-        }
+    public void cargarFabricacion(String usuario, String contraseña, String url, Scanner sc) {
+        try {
+            int opcion;
+            do {
+                menuFabricacion();
+                opcion = Main.leerInt(sc, "> ");
+                ejecutarFabricacion(opcion);
+            } while (opcion != 0);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        } 
     }
     
     private void menuFabricacion() {
@@ -33,10 +38,10 @@ public class Fabricacion {
         System.out.println("0. Volver");
     }
     
-    private void ejecutarFabricacion(int opcion, Scanner sc) {
+    private void ejecutarFabricacion(int opcion) {
         switch (opcion) {
             case 1 -> consultarFabricacion();
-            case 0 -> Main.mostarMenu(sc, usuario, contraseña, url);
+            case 0 -> {}
             default -> System.out.println("Error: Opción incorrecta.");
         }
     }
@@ -53,7 +58,7 @@ public class Fabricacion {
                 ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                 int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                 
-                System.err.println("\n=== Ordenes Fabricación ===\n");
+                System.out.println("\n=== Ordenes Fabricación ===\n");
                 Main.imprimirLinea(cabeceras, anchos);
                 Main.imprimirSeparador(anchos);
                 for (String[] fila : filas) {

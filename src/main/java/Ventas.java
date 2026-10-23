@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,14 +28,16 @@ public class Ventas {
         this.url = url;
     }
     
-    public void cargarVentas(String usuario, String contraseña, String url) {
-        try (Scanner scanner = new Scanner(System.in)) {
+    public void cargarVentas(String usuario, String contraseña, String url, Scanner sc) {
+        try {
             int opcion;
             do { 
                 menuVentas();
-                opcion = Main.leerInt(scanner, "> ");
-                ejecutarVentas(opcion, scanner);
+                opcion = Main.leerInt(sc, "> ");
+                ejecutarVentas(opcion, sc);
             } while (opcion != 0);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
     
@@ -45,54 +48,49 @@ public class Ventas {
         System.out.println("0. Volver");
     }
     
-    private void ejecutarVentas(int opcion, Scanner scanner) {
-        while (true) { 
-            switch (opcion) {
-                case 1 -> añadirPresupuesto(scanner);
-                case 2 -> confirmarPresupuesto(scanner);
-                case 0 -> Main.mostarMenu(scanner, usuario, contraseña, url);
-                default -> System.out.println("Error: Opción introducida incorrecta");
-            }
+    private void ejecutarVentas(int opcion, Scanner sc) {
+        switch (opcion) {
+            case 1 -> añadirPresupuesto(sc);
+            case 2 -> confirmarPresupuesto(sc);
+            case 0 -> {}
+            default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
     
-    private void añadirPresupuesto(Scanner scanner) {
+    private void añadirPresupuesto(Scanner sc) {
         List<Producto> productos = new ArrayList<>();
         String seguir;
         while (true) { 
-            
-            System.out.println("====== Nuevo Presupuesto ======");
-            String cliente = Main.leerString(scanner, "Cliente: ");
-            int idOportunidad = Main.leerInt(scanner, "Id oportunidad asociada: ");
-            
-            do {
-                String producto = Main.leerString(scanner, "Producto: ");
-                int cantidad = Main.leerInt(scanner, "Cantidad: ");
+            try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+                System.out.println("====== Nuevo Presupuesto ======");
+                String cliente = Main.leerString(sc, "Cliente: ");
+                int idOportunidad = Main.leerInt(sc, "Id oportunidad asociada: ");
                 
-                try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                    PreparedStatement st = conn.prepareStatement("SELECT id, precio FROM productos WHERE nombre = ?");
-                    st.setString(1, producto);
-                    ResultSet rs = st.executeQuery();
-                    if (rs.next()) {
-                        int id = rs.getInt("id");
-                        int precio = rs.getInt("precio");
-                        productos.add(new Producto(id, producto, cantidad, precio));
-                    } else {
-                        System.out.println("Error: El producto " + producto + " no existe");
+                do {
+                    String producto = Main.leerString(sc, "Producto: ");
+                    int cantidad = Main.leerInt(sc, "Cantidad: ");
+                    
+                    try (PreparedStatement st = conn.prepareStatement("SELECT id, precio FROM productos WHERE nombre = ?")) {
+                        st.setString(1, producto);
+                        ResultSet rs = st.executeQuery();
+                        if (rs.next()) {
+                            int id = rs.getInt("id");
+                            int precio = rs.getInt("precio");
+                            productos.add(new Producto(id, producto, cantidad, precio));
+                        } else {
+                            System.out.println("Error: El producto " + producto + " no existe");
+                            return;
+                        }
+                    } catch (SQLException e) {
+                        System.out.println("Error: " + e.getMessage());
                         return;
                     }
-                } catch (SQLException e) {
-                    System.out.println("Error: " + e.getMessage());
-                    return;
-                }
-                System.out.print("¿Quieres añadir otro producto? (s/n): ");
-                seguir = scanner.nextLine().trim();
-            } while (seguir.equalsIgnoreCase("s"));
-            
-            LocalDate fechaValidez = LocalDate.parse(Main.leerString(scanner, "Fecha validez (yyyy-MM-dd): "));
-            String observaciones = Main.leerString(scanner, "Observaciones: ");
-            
-            try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+                    System.out.print("¿Quieres añadir otro producto? (s/n): ");
+                    seguir = sc.nextLine().trim();
+                } while (seguir.equalsIgnoreCase("s"));
+                
+                LocalDate fechaValidez = LocalDate.parse(Main.leerString(sc, "Fecha validez (yyyy-MM-dd): "));
+                String observaciones = Main.leerString(sc, "Observaciones: ");
                 PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
                 stId.setString(1, cliente);
                 ResultSet rsId = stId.executeQuery();
@@ -111,7 +109,9 @@ public class Ventas {
                     
                     st.executeUpdate();
                 } else { System.out.println("Error: Cliente introducido no existe"); }
-            } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); }
+            } catch (SQLException | DateTimeParseException e) {
+                System.out.println("Error: " + e.getMessage());
+            }
             
             try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
                 PreparedStatement psPresupuesto = conn.prepareStatement("SELECT id FROM presupuestos ORDER BY id DESC LIMIT 1;");
@@ -119,7 +119,10 @@ public class Ventas {
                 
                 if (rs.next()) {
                     int idPresupuesto = rs.getInt("id");
-                    PreparedStatement ps = conn.prepareStatement("INSERT INTO lineas_presupuesto (presupuesto_id, producto_id, cantidad, precio_unitario)");
+                    PreparedStatement ps = conn.prepareStatement("""
+                        INSERT INTO lineas_presupuesto (presupuesto_id, producto_id, cantidad, precio_unitario)
+                        VALUES (?, ?, ?, ?)
+                    """);
                     for (Producto p : productos) {
                         ps.setInt(1, idPresupuesto);
                         ps.setInt(2, p.id());
@@ -129,24 +132,24 @@ public class Ventas {
                     }
                     
                     ps.executeBatch();
+                    System.out.println("Se ha creado el presupuesto correctamente");
                 }
             } catch (SQLException e) {
-                System.err.println("Error al insertar: " + e.getMessage());
+                System.out.println("Error al insertar: " + e.getMessage());
                 // al cerrarse la conexión sin commit, se descarta la transacción
             }
-            System.out.println("Se ha creado el presupuesto correctamente");
             break;
         }
     }
     
-    private void confirmarPresupuesto(Scanner scanner) {
+    private void confirmarPresupuesto(Scanner sc) {
         System.out.println("====== Confirmar presupuesto ======");
-        int id = Main.leerInt(scanner, "Introduce el id del presupuesto a aceptar: ");
+        int id = Main.leerInt(sc, "Introduce el id del presupuesto a aceptar: ");
         System.out.println("Se establecerá el estado del presupuesto nº " + id + " como 'aceptado'.");
         // Se repite hasta recibir y/n (antes, cualquier otra entrada provocaba un bucle infinito)
         String conf;
         do {
-            conf = Main.leerString(scanner, "¿Seguro que quieres proceder? (y/n): ").trim().toLowerCase();
+            conf = Main.leerString(sc, "¿Seguro que quieres proceder? (y/n): ").trim().toLowerCase();
         } while (!conf.equals("y") && !conf.equals("n"));
         if (conf.equals("n")) {
             System.out.println("Acción cancelada");

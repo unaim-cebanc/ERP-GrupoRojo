@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -21,14 +22,16 @@ public class Crm {
         this.url = url;
     }
     
-    public void cargarCrm(String usuario, String contraseña, String url) {
-        try (Scanner scanner = new Scanner(System.in)) {
+    public void cargarCrm(String usuario, String contraseña, String url, Scanner sc) {
+        try {
             int opcion;
             do { 
                 menuCrm();
-                opcion = Main.leerInt(scanner, "> ");
-                ejecutarCrm(opcion, scanner);
+                opcion = Main.leerInt(sc, "> ");
+                ejecutarCrm(opcion, sc);
             } while (opcion != 0);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
     
@@ -42,26 +45,26 @@ public class Crm {
         System.out.println("0. Volver");
     }
     
-    private void ejecutarCrm(int opcion, Scanner scanner) {
+    private void ejecutarCrm(int opcion, Scanner sc) {
         switch (opcion) {
-            case 1 -> añadirOportunidad(scanner);
-            case 2 -> añadirPresupuesto(scanner);
-            case 3 -> mostrarOportunidad(scanner);
-            case 4 -> confirmarPresupuesto(scanner);
-            case 5 -> eliminarOportunidad(scanner);
-            case 0 -> Main.mostarMenu(scanner, usuario, contraseña, url);
+            case 1 -> añadirOportunidad(sc);
+            case 2 -> añadirPresupuesto(sc);
+            case 3 -> mostrarOportunidad(sc);
+            case 4 -> confirmarPresupuesto(sc);
+            case 5 -> eliminarOportunidad(sc);
+            case 0 -> {}
             default -> System.out.println("Opcion introducida incorrecta");
         }
     }
     
-    private void añadirOportunidad(Scanner scanner) {
+    private void añadirOportunidad(Scanner sc) {
         while (true) { 
             System.out.println("====== Nueva Oportunidad ======");
-            String cliente = Main.leerString(scanner, "Cliente: ");
-            String titulo = Main.leerString(scanner, "Título: ");
-            int importe = Main.leerInt(scanner, "Importe estimado: ");
-            int probabilidad = Main.leerInt(scanner, "Probabilidad: ");
-            LocalDate fechaCierrePrevista = LocalDate.parse(Main.leerString(scanner, "Fecha cierre prevista (yyyy-MM-dd): "));
+            String cliente = Main.leerString(sc, "Cliente: ");
+            String titulo = Main.leerString(sc, "Título: ");
+            int importe = Main.leerInt(sc, "Importe estimado: ");
+            int probabilidad = Main.leerInt(sc, "Probabilidad: ");
+            LocalDate fechaCierrePrevista = LocalDate.parse(Main.leerString(sc, "Fecha cierre prevista (yyyy-MM-dd): "));
             
             try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
                 PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
@@ -90,15 +93,15 @@ public class Crm {
         }
     }
     
-    private void añadirPresupuesto(Scanner scanner) {
+    private void añadirPresupuesto(Scanner sc) {
         while (true) { 
-            System.out.println("====== Nuevo Presupuesto ======");
-            String cliente = Main.leerString(scanner, "Cliente: ");
-            int idOportunidad = Main.leerInt(scanner, "Id oportunidad asociada: ");
-            LocalDate fechaValidez = LocalDate.parse(Main.leerString(scanner, "Fecha validez (yyyy-MM-dd): "));
-            String observaciones = Main.leerString(scanner, "Observaciones: ");
-            
             try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+                System.out.println("====== Nuevo Presupuesto ======");
+                String cliente = Main.leerString(sc, "Cliente: ");
+                int idOportunidad = Main.leerInt(sc, "Id oportunidad asociada: ");
+                LocalDate fechaValidez = LocalDate.parse(Main.leerString(sc, "Fecha validez (yyyy-MM-dd): "));
+                String observaciones = Main.leerString(sc, "Observaciones: ");
+                
                 PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
                 stId.setString(1, cliente);
                 ResultSet rsId = stId.executeQuery();
@@ -118,17 +121,19 @@ public class Crm {
                     
                     st.executeUpdate();
                 } else { System.out.println("Error: Cliente introducido no existe"); }
-            } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); }
+            } catch (SQLException | DateTimeParseException e) {
+                System.out.println("Error: " + e.getMessage());
+            }
             System.out.println("Se ha creado el presupuesto correctamente");
             break;
         }
     }
     
-    private void mostrarOportunidad(Scanner scanner) {
+    private void mostrarOportunidad(Scanner sc) {
         System.out.println("====== Mostrar Oportunidad ======");
         System.out.println("Deseas mostrar todos los registros? (y/n)");
         
-        String opcion = Main.leerString(scanner, "> ").toLowerCase();
+        String opcion = Main.leerString(sc, "> ").toLowerCase();
         try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
             if (opcion.equals("y")) {
                 PreparedStatement st = conn.prepareStatement("""
@@ -144,7 +149,8 @@ public class Crm {
                     o.fecha_cierre AS 'FECHA CIERRE',
                     p.id AS 'ID PRESUPUESTO',
                     p.estado AS 'ESTADO PRESUPUESTO'
-                FROM oportunidades AS o INNER JOIN presupuestos AS p WHERE o.id = p.oportunidad_id""");
+                FROM oportunidades AS o
+                LEFT JOIN presupuestos AS p WHERE o.id = p.oportunidad_id""");
                 
                 ResultSet rs = st.executeQuery();
                 
@@ -155,7 +161,7 @@ public class Crm {
                     ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                     int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                     
-                    System.err.println("\n=== OPORTUNIDADES ===\n");
+                    System.out.println("\n=== OPORTUNIDADES ===\n");
                     Main.imprimirLinea(cabeceras, anchos);
                     Main.imprimirSeparador(anchos);
                     for (String[] fila : filas) {
@@ -166,7 +172,7 @@ public class Crm {
                 }
             } else if (opcion.equals("n")) {
                 System.out.println("Introduce el id de la oportunidad que deseas revisar");
-                int id = Main.leerInt(scanner, "> ");
+                int id = Main.leerInt(sc, "> ");
                 PreparedStatement st = conn.prepareStatement("""
                 SELECT
                     o.id AS 'id',
@@ -194,7 +200,7 @@ public class Crm {
                     ArrayList<String[]> filas = Main.recogerDatos(rs, columnas);
                     int[] anchos = Main.calcularAnchos(columnas, cabeceras, filas);
                     
-                    System.err.println("\n=== OPORTUNIDAD ===\n");
+                    System.out.println("\n=== OPORTUNIDAD ===\n");
                     Main.imprimirLinea(cabeceras, anchos);
                     Main.imprimirSeparador(anchos);
                     for (String[] fila : filas) {
@@ -207,15 +213,15 @@ public class Crm {
         } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); }
     }
     
-    private void confirmarPresupuesto(Scanner scanner) {
+    private void confirmarPresupuesto(Scanner sc) {
         while (true) {
             System.out.println("====== Confirmar presupuesto ======");
-            int id = Main.leerInt(scanner, "Introduce el id del presupuesto a aceptar: ");
+            int id = Main.leerInt(sc, "Introduce el id del presupuesto a aceptar: ");
             System.out.println("Se establecera el estado del presupuesto nº " + id + " como 'aceptado'.");
-            String conf = Main.leerString(scanner, "Seguro que quieres proceder? (y/n): ").toLowerCase();
+            String conf = Main.leerString(sc, "Seguro que quieres proceder? (y/n): ").toLowerCase();
             switch (conf) {
                 case "y" -> {
-                    if (verificarId(id, "presupuestos")) {
+                    if (Main.verificarId(id, "presupuestos")) {
                         try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
                             PreparedStatement st = conn.prepareStatement("UPDATE presupuestos SET estado = 'aceptado' WHERE id = ?");
                             
@@ -239,7 +245,7 @@ public class Crm {
         }
     }
     
-    private void eliminarOportunidad(Scanner scanner) {
+    private void eliminarOportunidad(Scanner sc) {
         int id;
         String conf;
         
@@ -247,19 +253,21 @@ public class Crm {
             System.out.println("====== Eliminar Oportunidad ======");
             System.out.println("Introduce el id de la oportunidad que deseas eliminar");
             
-            id = Main.leerInt(scanner, "> ");
+            id = Main.leerInt(sc, "> ");
             
             System.out.println("Seguro que quieres eliminar la oportunidad nº " + id + "? (y/n)");
             
-            conf = Main.leerString(scanner, "> ").toLowerCase();
+            conf = Main.leerString(sc, "> ").toLowerCase();
             
             switch (conf) {
                 case "y" -> {
-                    if (verificarId(id, "oportunidades")) {
+                    if (Main.verificarId(id, "oportunidades")) {
                         try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
                             PreparedStatement st = conn.prepareStatement("DELETE FROM oportunidades WHERE id = ?");
                             st.setInt(1, id);
                             st.executeUpdate();
+                            
+                            System.out.println("Se ha eliminado la oportunidad correctamente");
                             return;
                         } catch (SQLException e) {
                             System.out.println("Error: " + e.getMessage());
@@ -274,18 +282,5 @@ public class Crm {
                 default -> System.out.println("Error: Valor introducido no esperado");
             }
         }
-    }
-    
-    private Boolean verificarId(int id, String tabla) {
-        try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-            PreparedStatement st = conn.prepareStatement("SELECT * FROM " + tabla + " WHERE id = ?");
-            st.setInt(1, id);
-            
-            ResultSet rs = st.executeQuery();
-            return rs.isBeforeFirst();
-        } catch (SQLException e) {
-            System.out.println("Error: " + e.getMessage());
-        }
-        return false;
     }
 }

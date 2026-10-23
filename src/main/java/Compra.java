@@ -19,14 +19,16 @@ public class Compra {
         this.url = url;
     }
     
-    public void cargarCompra(String usuario, String contraseña, String url) {
-        try (Scanner sc = new Scanner(System.in)){
+    public void cargarCompra(String usuario, String contraseña, String url, Scanner sc) {
+        try {
             int opcion;
             do { 
                 mostrarMenu();
                 opcion = Main.leerInt(sc, "> ");
                 ejecutarCompra(opcion, sc);
             } while (opcion != 0);
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
     
@@ -41,7 +43,7 @@ public class Compra {
         switch (opcion) {
             case 1 -> listarPresupuestos();
             case 2 -> confirmarPresupuesto(sc);
-            case 0 -> Main.mostarMenu(sc, usuario, contraseña, url);
+            case 0 -> {}
             default -> System.out.println("Error: Opción introducida incorrecta");
         }
     }
