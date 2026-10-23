@@ -88,7 +88,7 @@ public class Inventario {
                 e.almacen_id AS 'ALMACEN',
                 e.cantidad AS 'STOCK ACTUAL'
             FROM productos AS p 
-            INNER JOIN existencias AS e WHERE p.id = e.producto_id 
+            INNER JOIN existencias AS e ON p.id = e.producto_id 
             """);
             
             ResultSet rs = st.executeQuery();
@@ -194,33 +194,55 @@ public class Inventario {
             switch (conf) {
                 case "y" -> {
                     try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                        PreparedStatement st = conn.prepareStatement("UPDATE recepciones SET estado = 'recibida', fecha_recepcion = NOW() WHERE id = ?");
-                        st.setInt(1, id);
-                        st.executeUpdate();
-                        
-                        PreparedStatement st2 = conn.prepareStatement("SELECT producto_id, cantidad_recibida FROM recepciones WHERE id = ?");
-                        st2.setInt(1, id);
-                        ResultSet rs = st2.executeQuery();
-                        
-                        if (rs.next()) {
-                            int idProducto = rs.getInt("producto_id");
-                            int cantidad = rs.getInt("cantidad_recibida");
+                        conn.setAutoCommit(false);
+                        try {
+                            int idProducto;
+                            int cantidad;
                             
-                            PreparedStatement st3 = conn.prepareStatement("UPDATE existencias SET cantidad = cantidad + ? WHERE producto_id = ?");
-                            st3.setInt(1, cantidad);
-                            st3.setInt(2, idProducto);
-                            st3.executeUpdate();
+                            try (PreparedStatement st = conn.prepareStatement(
+                                    "SELECT producto_id, cantidad_recibida, estado FROM recepciones WHERE id = ? FOR UPDATE")) {
+                                st.setInt(1, id);
+                                try (ResultSet rs = st.executeQuery()) {
+                                    if (!rs.next()) {
+                                        throw new IllegalStateException("La recepción " + id + " no existe");
+                                    }
+                                    if ("recibida".equals(rs.getString("estado"))) {
+                                        throw new IllegalStateException("La recepción " + id + " ya estaba confirmada");
+                                    }
+                                    idProducto = rs.getInt("producto_id");
+                                    cantidad = rs.getInt("cantidad_recibida");
+                                }
+                            }
                             
-                        } else {
-                            System.out.println("Error: No se han encontrado los datos relacionados con la recepcion " + id);
-                            return;
+                            try (PreparedStatement st = conn.prepareStatement(
+                                    "UPDATE recepciones SET estado = 'recibida', fecha_recepcion = NOW() WHERE id = ?")) {
+                                st.setInt(1, id);
+                                st.executeUpdate();
+                            }
+                            
+                            try (PreparedStatement st = conn.prepareStatement(
+                                    "UPDATE existencias SET cantidad = cantidad + ? WHERE producto_id = ? AND almacen_id = 1")) {
+                                st.setInt(1, cantidad);
+                                st.setInt(2, idProducto);
+                                if (st.executeUpdate() == 0) {
+                                    try (PreparedStatement ins = conn.prepareStatement(
+                                            "INSERT INTO existencias (almacen_id, producto_id, cantidad) VALUES (1, ?, ?)")) {
+                                        ins.setInt(1, idProducto);
+                                        ins.setInt(2, cantidad);
+                                        ins.executeUpdate();
+                                    }
+                                }
+                            }
+                            conn.commit();
+                            System.out.println("Operación realizada con éxito");
+                        } catch (SQLException | IllegalStateException e) {
+                            conn.rollback();
+                            System.out.println("Error: " + e.getMessage());
                         }
-                        System.out.println("Operación realizada con éxito");
-                        return;
                     } catch (SQLException e) {
-                        System.out.println("Error: " + e.getMessage());
-                        return;
+                        System.out.println("Error de conexión: " + e.getMessage());
                     }
+                    return;
                 }
                 case "n" -> {
                     System.out.println("Operación cancelada");
@@ -282,33 +304,51 @@ public class Inventario {
             switch (conf) {
                 case "y" -> {
                     try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                        PreparedStatement st = conn.prepareStatement("UPDATE entregas SET estado = 'entregada', fecha_entrega = NOW() WHERE id = ?");
-                        st.setInt(1, id);
-                        st.executeUpdate();
-                        
-                        PreparedStatement st2 = conn.prepareStatement("SELECT producto_id, cantidad_entregada FROM entregas WHERE id = ?");
-                        st2.setInt(1, id);
-                        ResultSet rs = st2.executeQuery();
-                        
-                        if (rs.next()) {
-                            int idProducto = rs.getInt("producto_id");
-                            int cantidad = rs.getInt("cantidad_entregada");
+                        conn.setAutoCommit(false);
+                        try {
+                            int idProducto;
+                            int cantidad;
                             
-                            PreparedStatement st3 = conn.prepareStatement("UPDATE existencias SET cantidad = cantidad - ? WHERE producto_id = ?");
-                            st3.setInt(1, cantidad);
-                            st3.setInt(2, idProducto);
-                            st3.executeUpdate();
+                            try (PreparedStatement st = conn.prepareStatement(
+                                    "SELECT producto_id, cantidad_entregada, estado FROM entregas WHERE id = ? FOR UPDATE")) {
+                                st.setInt(1, id);
+                                try (ResultSet rs = st.executeQuery()) {
+                                    if (!rs.next()) {
+                                        throw new IllegalStateException("La entrega " + id + " no existe");
+                                    }
+                                    if ("entregada".equals(rs.getString("estado"))) {
+                                        throw new IllegalStateException("La entrega " + id + " ya estaba confirmada");
+                                    }
+                                    idProducto = rs.getInt("producto_id");
+                                    cantidad = rs.getInt("cantidad_entregada");
+                                }
+                            }
                             
-                        } else {
-                            System.out.println("Error: No se han encontrado los datos relacionados con la recepcion " + id);
-                            return;
+                            try (PreparedStatement st = conn.prepareStatement(
+                                    "UPDATE existencias SET cantidad = cantidad - ? WHERE producto_id = ? AND almacen_id = 1 AND cantidad >= ?")) {
+                                st.setInt(1, cantidad);
+                                st.setInt(2, idProducto);
+                                st.setInt(3, cantidad);
+                                if (st.executeUpdate() == 0) {
+                                    throw new IllegalStateException("No hay stock suficiente del producto " + idProducto);
+                                }
+                            }
+                            
+                            try (PreparedStatement st = conn.prepareStatement(
+                                    "UPDATE entregas SET estado = 'entregada', fecha_entrega = NOW() WHERE id = ?")) {
+                                st.setInt(1, id);
+                                st.executeUpdate();
+                            }
+                            conn.commit();
+                            System.out.println("Operación realizada con éxito");
+                        } catch (SQLException | IllegalStateException e) {
+                            conn.rollback();
+                            System.out.println("Error: " + e.getMessage());
                         }
-                        System.out.println("Operación realizada con éxito");
-                        return;
                     } catch (SQLException e) {
-                        System.out.println("Error: " + e.getMessage());
-                        return;
+                        System.out.println("Error de conexión: " + e.getMessage());
                     }
+                    return;
                 }
                 case "n" -> {
                     System.out.println("Operación cancelada");
@@ -361,6 +401,7 @@ public class Inventario {
             System.out.println("Error: " + e.getMessage());
         }
     }
+    
     record Componente(int id, int idProveedor, BigDecimal costo, int necesaria, int disponible) {
         int faltante() { return necesaria - disponible; }
     }

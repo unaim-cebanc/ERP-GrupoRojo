@@ -6,6 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Scanner;
@@ -178,6 +180,17 @@ public class Main {
             try {
                 return Integer.parseInt(entrada);
             } catch (NumberFormatException e) {System.out.println("Error:" + e.getMessage());}
+        }
+    }
+    
+    public static LocalDate leerFecha(Scanner sc, String mensaje) {
+        while (true) {
+            String entrada = leerString(sc, mensaje);
+            try {
+                return LocalDate.parse(entrada);
+            } catch (DateTimeParseException e) {
+                System.out.println("Error: Fecha incorrecta, usa el formato yyyy-MM-dd (ej: 2026-12-31)");
+            }
         }
     }
     

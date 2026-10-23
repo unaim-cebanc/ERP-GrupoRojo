@@ -50,7 +50,7 @@ public class Crm {
             case 1 -> añadirOportunidad(sc);
             case 2 -> añadirPresupuesto(sc);
             case 3 -> mostrarOportunidad(sc);
-            case 4 -> confirmarPresupuesto(sc);
+            case 4 -> new Ventas(usuario, contraseña, url).confirmarPresupuesto(sc);
             case 5 -> eliminarOportunidad(sc);
             case 0 -> {}
             default -> System.out.println("Opcion introducida incorrecta");
@@ -58,74 +58,66 @@ public class Crm {
     }
     
     private void añadirOportunidad(Scanner sc) {
-        while (true) { 
-            System.out.println("====== Nueva Oportunidad ======");
-            String cliente = Main.leerString(sc, "Cliente: ");
-            String titulo = Main.leerString(sc, "Título: ");
-            int importe = Main.leerInt(sc, "Importe estimado: ");
-            int probabilidad = Main.leerInt(sc, "Probabilidad: ");
-            LocalDate fechaCierrePrevista = LocalDate.parse(Main.leerString(sc, "Fecha cierre prevista (yyyy-MM-dd): "));
+        System.out.println("====== Nueva Oportunidad ======");
+        String cliente = Main.leerString(sc, "Cliente: ");
+        String titulo = Main.leerString(sc, "Título: ");
+        int importe = Main.leerInt(sc, "Importe estimado: ");
+        int probabilidad = Main.leerInt(sc, "Probabilidad: ");
+        LocalDate fechaCierrePrevista = Main.leerFecha(sc, "Fecha cierre prevista (yyyy-MM-dd): ");
+        
+        try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+            PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
+            stId.setString(1, cliente);
+            ResultSet rsId = stId.executeQuery();
             
-            try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
-                stId.setString(1, cliente);
-                ResultSet rsId = stId.executeQuery();
+            if (rsId.next()) {
+                int idCliente = rsId.getInt(1);
                 
-                if (rsId.isBeforeFirst()) {
-                    rsId.next();
-                    int idCliente = rsId.getInt(1);
-                    
-                    PreparedStatement st = conn.prepareStatement("INSERT INTO oportunidades" +
-                    "(cliente_id, titulo, importe_estimado, probabilidad, fecha_cierre_prevista)" + 
-                    "VALUES (?, ?, ?, ?, ?)");
-                    
-                    st.setInt(1, idCliente);
-                    st.setString(2, titulo);
-                    st.setInt(3, importe);
-                    st.setInt(4, probabilidad);
-                    st.setObject(5, fechaCierrePrevista);
-                    
-                    st.executeUpdate();
-                } else { System.out.println("Error: Cliente introducido no existe"); }
-            } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); break;}
-            System.out.println("Se ha creado la oportunidad correctamente");
-            break;
-        }
+                PreparedStatement st = conn.prepareStatement("INSERT INTO oportunidades" +
+                "(cliente_id, titulo, importe_estimado, probabilidad, fecha_cierre_prevista)" + 
+                "VALUES (?, ?, ?, ?, ?)");
+                
+                st.setInt(1, idCliente);
+                st.setString(2, titulo);
+                st.setInt(3, importe);
+                st.setInt(4, probabilidad);
+                st.setObject(5, fechaCierrePrevista);
+                
+                st.executeUpdate();
+                System.out.println("Se ha creado la oportunidad correctamente");
+            } else { System.out.println("Error: Cliente introducido no existe"); }
+        } catch (SQLException e) { System.out.println("Error: " + e.getMessage());}
     }
     
     private void añadirPresupuesto(Scanner sc) {
-        while (true) { 
-            try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                System.out.println("====== Nuevo Presupuesto ======");
-                String cliente = Main.leerString(sc, "Cliente: ");
-                int idOportunidad = Main.leerInt(sc, "Id oportunidad asociada: ");
-                LocalDate fechaValidez = LocalDate.parse(Main.leerString(sc, "Fecha validez (yyyy-MM-dd): "));
-                String observaciones = Main.leerString(sc, "Observaciones: ");
+        System.out.println("====== Nuevo Presupuesto ======");
+        String cliente = Main.leerString(sc, "Cliente: ");
+        int idOportunidad = Main.leerInt(sc, "Id oportunidad asociada: ");
+        LocalDate fechaValidez = LocalDate.parse(Main.leerString(sc, "Fecha validez (yyyy-MM-dd): "));
+        String observaciones = Main.leerString(sc, "Observaciones: ");
+        
+        try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
+            PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
+            stId.setString(1, cliente);
+            ResultSet rsId = stId.executeQuery();
+            
+            if (rsId.next()) {
+                int idCliente = rsId.getInt(1);
                 
-                PreparedStatement stId = conn.prepareStatement("SELECT id FROM clientes WHERE nombre = ?");
-                stId.setString(1, cliente);
-                ResultSet rsId = stId.executeQuery();
+                PreparedStatement st = conn.prepareStatement("INSERT INTO presupuestos" +
+                "(cliente_id, oportunidad_id, fecha_validez, observaciones)" + 
+                "VALUES (?, ?, ?, ?)");
                 
-                if (rsId.isBeforeFirst()) {
-                    rsId.next();
-                    int idCliente = rsId.getInt(1);
-                    
-                    PreparedStatement st = conn.prepareStatement("INSERT INTO presupuestos" +
-                    "(cliente_id, oportunidad_id, fecha_validez, observaciones)" + 
-                    "VALUES (?, ?, ?, ?)");
-                    
-                    st.setInt(1, idCliente);
-                    st.setInt(2, idOportunidad);
-                    st.setObject(3, fechaValidez);
-                    st.setString(4, observaciones);
-                    
-                    st.executeUpdate();
-                } else { System.out.println("Error: Cliente introducido no existe"); }
-            } catch (SQLException | DateTimeParseException e) {
-                System.out.println("Error: " + e.getMessage());
-            }
-            System.out.println("Se ha creado el presupuesto correctamente");
-            break;
+                st.setInt(1, idCliente);
+                st.setInt(2, idOportunidad);
+                st.setObject(3, fechaValidez);
+                st.setString(4, observaciones);
+                
+                st.executeUpdate();
+                System.out.println("Se ha creado el presupuesto correctamente");
+            } else { System.out.println("Error: Cliente introducido no existe"); }
+        } catch (SQLException | DateTimeParseException e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
     
@@ -150,7 +142,7 @@ public class Crm {
                     p.id AS 'ID PRESUPUESTO',
                     p.estado AS 'ESTADO PRESUPUESTO'
                 FROM oportunidades AS o
-                LEFT JOIN presupuestos AS p WHERE o.id = p.oportunidad_id""");
+                LEFT JOIN presupuestos AS p ON o.id = p.oportunidad_id""");
                 
                 ResultSet rs = st.executeQuery();
                 
@@ -187,7 +179,7 @@ public class Crm {
                     p.id AS 'presupuesto',
                     p.estado AS 'estado presupuesto'
                 FROM oportunidades AS o 
-                INNER JOIN presupuestos AS p ON o.id = p.oportunidad_id
+                LEFT JOIN presupuestos AS p ON o.id = p.oportunidad_id
                 WHERE o.id = ?""");
                 st.setInt(1, id);
                 
@@ -211,38 +203,6 @@ public class Crm {
                 }
             }
         } catch (SQLException e) { System.out.println("Error: " + e.getMessage()); }
-    }
-    
-    private void confirmarPresupuesto(Scanner sc) {
-        while (true) {
-            System.out.println("====== Confirmar presupuesto ======");
-            int id = Main.leerInt(sc, "Introduce el id del presupuesto a aceptar: ");
-            System.out.println("Se establecera el estado del presupuesto nº " + id + " como 'aceptado'.");
-            String conf = Main.leerString(sc, "Seguro que quieres proceder? (y/n): ").toLowerCase();
-            switch (conf) {
-                case "y" -> {
-                    if (Main.verificarId(id, "presupuestos")) {
-                        try (Connection conn = DriverManager.getConnection(url, usuario, contraseña)) {
-                            PreparedStatement st = conn.prepareStatement("UPDATE presupuestos SET estado = 'aceptado' WHERE id = ?");
-                            
-                            st.setInt(1, id);
-                            st.executeUpdate();
-                            return;
-                        } catch (SQLException e) {
-                            System.out.println("Error: " + e.getMessage());
-                            return;
-                        }
-                    } else {
-                        System.out.println("Presupuesto con id " + id + " no existe");
-                        return;
-                    }
-                }
-                case "n" -> {
-                    System.out.println("Acción cancelada");
-                    return;
-                }
-            }
-        }
     }
     
     private void eliminarOportunidad(Scanner sc) {
@@ -273,7 +233,7 @@ public class Crm {
                             System.out.println("Error: " + e.getMessage());
                             return;
                         }
-                    }
+                    } 
                 }
                 case "n" -> {
                     System.out.println("Operación cancelada");
