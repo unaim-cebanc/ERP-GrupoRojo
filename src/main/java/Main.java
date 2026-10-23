@@ -66,8 +66,8 @@ public class Main {
         switch (opcion) {
             case 1 -> {
                 if (usuario.equals("deca_crm") || usuario.equals("deca_admin")) {
-                    Ventas ventas = new Ventas(usuario, contraseña, url);
-                    ventas.cargarVentas(usuario, contraseña, url);
+                    Crm crm = new Crm(usuario, contraseña, url);
+                    crm.cargarCrm(usuario, contraseña, url);
                 } else { System.out.println("Error: Acceso denegado"); }
             }
             case 2 -> {

@@ -169,18 +169,20 @@ public class Crm {
                 int id = Main.leerInt(scanner, "> ");
                 PreparedStatement st = conn.prepareStatement("""
                 SELECT
-                    o.id AS 'ID',
-                    o.cliente_id AS 'ID CLIENTE',
-                    o.titulo AS 'TITULO',
-                    o.importe_estimado AS 'IMPORTE ESTIMADO',
-                    o.probabilidad AS 'PROBABLIDAD',
-                    o.etapa AS 'ETAPA',
-                    o.fecha_creacion AS 'FECHA CREACIÓN',
-                    o.fecha_cierre_prevista AS 'CIERRE PREVISTO',
-                    o.fecha_cierre AS 'FECHA CIERRE',
-                    p.id AS 'ID PRESUPUESTO',
-                    p.estado AS 'ESTADO PRESUPUESTO'
-                FROM oportunidades AS o INNER JOIN presupuestos AS p WHERE o.id = p.oportunidad_id AND o.id = ?""");
+                    o.id AS 'id',
+                    o.cliente_id AS 'cliente',
+                    o.titulo AS 'titulo',
+                    o.importe_estimado AS 'importe estimado',
+                    o.probabilidad AS 'prob.',
+                    o.etapa AS 'etapa',
+                    o.fecha_creacion AS 'fecha creación',
+                    o.fecha_cierre_prevista AS 'cierre previsto',
+                    o.fecha_cierre AS 'fecha cierre',
+                    p.id AS 'presupuesto',
+                    p.estado AS 'estado presupuesto'
+                FROM oportunidades AS o 
+                INNER JOIN presupuestos AS p ON o.id = p.oportunidad_id
+                WHERE o.id = ?""");
                 st.setInt(1, id);
                 
                 ResultSet rs = st.executeQuery();

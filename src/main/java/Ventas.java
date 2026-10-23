@@ -42,6 +42,7 @@ public class Ventas {
         System.out.println("====== Ventas ======");
         System.out.println("1. Crear presupuesto");
         System.out.println("2. Confirmar presupuesto");
+        System.out.println("0. Volver");
     }
     
     private void ejecutarVentas(int opcion, Scanner scanner) {
@@ -49,6 +50,7 @@ public class Ventas {
             switch (opcion) {
                 case 1 -> añadirPresupuesto(scanner);
                 case 2 -> confirmarPresupuesto(scanner);
+                case 0 -> Main.mostarMenu(scanner, usuario, contraseña, url);
                 default -> System.out.println("Error: Opción introducida incorrecta");
             }
         }
